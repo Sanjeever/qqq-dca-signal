@@ -1,0 +1,122 @@
+timezone: Asia/Shanghai
+
+paths:
+  database: data/qqq_dca.sqlite
+  reports_dir: reports
+
+schedule:
+  warm_cache_time: "14:40:00"
+  run_time: "14:55:00"
+  data_deadline_seconds: 30
+  push_on_non_trading_day: false
+
+fund_universe:
+  mode: manual
+  include:
+    - code: "513100"
+      name: "国泰纳斯达克100ETF"
+      market: "sh"
+      enabled: true
+    - code: "159941"
+      name: "广发纳斯达克100ETF"
+      market: "sz"
+      enabled: true
+    - code: "513300"
+      name: "华夏纳斯达克100ETF"
+      market: "sh"
+      enabled: true
+    - code: "513110"
+      name: "华泰柏瑞纳斯达克100ETF"
+      market: "sh"
+      enabled: true
+    - code: "513390"
+      name: "博时纳斯达克100ETF"
+      market: "sh"
+      enabled: true
+    - code: "159632"
+      name: "华安纳斯达克100ETF"
+      market: "sz"
+      enabled: true
+    - code: "159659"
+      name: "招商纳斯达克100ETF"
+      market: "sz"
+      enabled: true
+    - code: "159660"
+      name: "汇添富纳斯达克100ETF"
+      market: "sz"
+      enabled: true
+    - code: "159501"
+      name: "嘉实纳斯达克100ETF"
+      market: "sz"
+      enabled: true
+    - code: "159513"
+      name: "大成纳斯达克100ETF"
+      market: "sz"
+      enabled: true
+    - code: "159696"
+      name: "易方达纳斯达克100ETF"
+      market: "sz"
+      enabled: true
+  watchlist:
+    - code: "161130"
+      name: "易方达纳斯达克100指数(QDII-LOF)"
+      reason: "LOF 不纳入默认 ETF 买入池"
+
+premium_filter:
+  lookback_days: 60
+  min_history_days: 40
+  max_percentile: 0.70
+  hard_cap: 0.12
+
+fund_selection:
+  near_tie_threshold: 0.003
+
+market_score:
+  threshold: 60
+  medium_trend:
+    weight: 25
+    ma_days: 120
+  short_pullback:
+    weight: 25
+    window_days: 3
+  overbought_control:
+    weight: 15
+    rsi_days: 14
+  nq_intraday_position:
+    weight: 20
+  volatility_risk:
+    weight: 15
+    volatility_days: 20
+    percentile_lookback_days: 252
+
+hard_filters:
+  nq_panic_change: -0.03
+  qqq_trend_break_ratio: 0.95
+
+data_sources:
+  fund_realtime_primary: eastmoney_direct
+  fund_history_primary: haoetf
+  qqq_symbol: QQQ
+  nq_symbol: NQ=F
+
+missing_data_policy:
+  if_any_required_missing: skip
+  allow_llm_to_guess: false
+
+llm:
+  enabled: false
+  api_url: "https://opencode.ai/zen/go/v1/chat/completions"
+  api_key: "${LLM_API_KEY}"
+  model: "gpt-4.1-mini"
+  temperature: 0.2
+  timeout_seconds: 20
+  fail_policy: "use_rule_summary_only"
+
+pushplus:
+  enabled: false
+  tokens:
+    - "${PUSHPLUS_TOKEN}"
+  topic: ""
+  template: markdown
+  timeout_seconds: 10
+  fail_policy: raise

@@ -1,0 +1,27 @@
+[project]
+name = "qqq-dca-signal"
+version = "0.1.0"
+description = "A local macOS QQQ-linked A-share ETF DCA signal runner."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "akshare>=1.18.64",
+    "beautifulsoup4>=4.15.0",
+    "exchange-calendars>=4.13.2",
+    "httpx>=0.28.1",
+    "pandas>=3.0.3",
+    "platformdirs>=4.10.0",
+    "plotly>=6.8.0",
+    "pyyaml>=6.0.3",
+    "rich>=15.0.0",
+    "tabulate>=0.10.0",
+    "typer>=0.26.8",
+    "yfinance>=1.5.1",
+]
+
+[project.scripts]
+qqq-dca-signal = "qqq_dca_signal.cli:app"
+
+[build-system]
+requires = ["uv_build>=0.11.25,<0.12.0"]
+build-backend = "uv_build"
