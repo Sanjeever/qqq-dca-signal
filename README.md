@@ -11,7 +11,7 @@
 - 使用 QQQ/NQ 市场评分，低于阈值则不买。
 - 每日只选择一只最优基金。
 - 通过 OpenAI 兼容 API 生成规则解释。
-- 通过 PushPlus 推送 Markdown 信号。
+- 通过 Bark / PushPlus 推送 Markdown 信号。
 - 买入信号标题直接包含推荐基金代码和名称。
 - 可选开启本地模拟交易账本：买入信号发出后记录 14:57 挂涨停价模拟买入，15:10 按当日收盘价结算。
 - 使用 SQLite 保存历史缓存、每日信号和回测结果。
@@ -27,19 +27,32 @@ uv run qqq-dca-signal warm-cache
 uv run qqq-dca-signal run-daily --dry-run
 ```
 
-`config.yaml` 可配置基金池、溢价规则、市场评分、OpenAI 兼容 API 和 PushPlus。真实密钥只放在本地 `config.yaml` 或环境变量中，不要提交。
+`config.yaml` 可配置基金池、溢价规则、市场评分、OpenAI 兼容 API 和推送通道。真实密钥只放在本地 `config.yaml` 或环境变量中，不要提交。
 
-PushPlus 只使用 `tokens` 字段；即使只有一个 token，也写成列表：
+推荐使用 Bark：
+
+```yaml
+bark:
+  enabled: true
+  server_url: "https://api.day.app"
+  keys:
+    - "${BARK_KEY}"
+  group: "qqq-dca-signal"
+  is_archive: true
+  timeout_seconds: 10
+```
+
+PushPlus 仍可作为可选通道。它只使用 `tokens` 字段；即使只有一个 token，也写成列表：
 
 ```yaml
 pushplus:
-  enabled: true
+  enabled: false
   tokens:
     - "${PUSHPLUS_TOKEN_1}"
     - "${PUSHPLUS_TOKEN_2}"
 ```
 
-程序会向 `tokens` 列表里的每个 token 推送。
+如果 Bark 和 PushPlus 同时开启，程序会向所有已开启通道推送。
 
 模拟交易默认关闭。需要开启时在本地 `config.yaml` 中配置：
 
@@ -67,9 +80,9 @@ uv run qqq-dca-signal settle-sim-trades
 
 `warm-cache` 用于预热当天历史溢价缓存。`run-daily` 默认不再临时拉取全量历史数据；如果当天缓存缺失，会返回 `SKIP_DATA`，避免 14:55 信号路径变慢。
 
-`--dry-run` 会正常拉数据、计算规则、调用 LLM、写 SQLite，但不会发送 PushPlus。
+`--dry-run` 会正常拉数据、计算规则、调用 LLM、写 SQLite，但不会发送推送。
 
-正式运行 `run-daily` 时，程序会先推送一条“开始计算”消息；计算完成后再推送最终买入或不买结论。`--dry-run` 只在终端打印，不发送 PushPlus。
+正式运行 `run-daily` 时，程序会先推送一条“开始计算”消息；计算完成后再推送最终买入或不买结论。`--dry-run` 只在终端打印，不发送推送。
 
 最终信号正文中，LLM 分析会放在前部；候选基金以 Markdown 表格展示。
 

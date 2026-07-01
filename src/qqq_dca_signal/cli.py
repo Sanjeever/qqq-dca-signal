@@ -15,7 +15,7 @@ from qqq_dca_signal.database import Database
 from qqq_dca_signal.launchd import install_launchd as install_launchd_plist
 from qqq_dca_signal.launchd import uninstall_launchd as uninstall_launchd_plist
 from qqq_dca_signal.llm import generate_analysis
-from qqq_dca_signal.pushplus import send_pushplus
+from qqq_dca_signal.notifier import send_notification
 from qqq_dca_signal.rules import render_signal_markdown
 from qqq_dca_signal.runner import DailyRunner, WarmCacheRunner, now_in_config_timezone
 from qqq_dca_signal.sim_trading import build_portfolio_summary, record_signal_trade, settle_pending_trades
@@ -47,7 +47,7 @@ def show_config(config: ConfigOption = None) -> None:
 @app.command("run-daily")
 def run_daily(
     config: ConfigOption = None,
-    dry_run: Annotated[bool, typer.Option("--dry-run", help="不发送 PushPlus，在终端打印内容。")] = False,
+    dry_run: Annotated[bool, typer.Option("--dry-run", help="不发送推送，在终端打印内容。")] = False,
     as_of: Annotated[
         str | None,
         typer.Option("--as-of", help="指定运行时间，例如 2026-06-30T14:55:00+08:00。"),
@@ -63,7 +63,7 @@ def run_daily(
     if dry_run:
         console.print(start_content)
     else:
-        send_pushplus("QQQ定投信号：开始计算", start_content, loaded)
+        send_notification("QQQ定投信号：开始计算", start_content, loaded)
 
     result = DailyRunner(loaded).run(run_at, dry_run=dry_run)
     if not dry_run:
@@ -84,8 +84,8 @@ def run_daily(
         console.print(content)
         return
 
-    send_pushplus(result.title, content, loaded)
-    console.print(f"已发送 PushPlus：{result.title}")
+    send_notification(result.title, content, loaded)
+    console.print(f"已发送推送：{result.title}")
 
 
 @app.command("warm-cache")

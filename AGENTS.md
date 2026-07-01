@@ -11,7 +11,7 @@
 - 拉取 A 股基金、QQQ、NQ 行情。
 - 根据明确规则计算 `BUY` / `SKIP_RULE` / `SKIP_DATA` / `SKIP_CALENDAR`。
 - 使用 LLM 解释规则结果。
-- 通过 PushPlus 推送信号，支持一个或多个 token。
+- 通过 Bark / PushPlus 推送信号，支持多 key / token。
 - 写入 SQLite 审计记录、回测记录和本地模拟交易记录。
 
 程序不负责：
@@ -29,7 +29,7 @@
 - A 股交易日 15:10 运行 `settle-sim-trades`，对本地模拟挂单按收盘价结算。
 - `launchd` 安装时从 `config.yaml` 读取运行时间；修改运行时间后需要重新安装 launchd。
 - `run-daily` 正式运行开始时先推送“开始计算”，完成后再推送最终信号。
-- 如果最终信号为 `BUY`，PushPlus 标题必须包含推荐基金代码和名称。
+- 如果最终信号为 `BUY`，推送标题必须包含推荐基金代码和名称。
 - 最终信号正文中，LLM 分析应靠前展示，候选基金使用 Markdown 表格。
 - 如果开启本地模拟交易，最终信号正文应展示模拟账户摘要、模拟持仓和最近模拟交易。
 - 用户如收到买入信号，按自己的策略在 14:57 挂涨停价买入。
@@ -100,4 +100,4 @@ uv run qqq-dca-signal --help
 uv run qqq-dca-signal show-config
 ```
 
-不要在没有用户要求时主动跑长周期回测、真实 PushPlus 推送或带真实 LLM 的耗时命令。
+不要在没有用户要求时主动跑长周期回测、真实推送或带真实 LLM 的耗时命令。

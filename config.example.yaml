@@ -121,6 +121,15 @@ pushplus:
   timeout_seconds: 10
   fail_policy: raise
 
+bark:
+  enabled: false
+  server_url: "https://api.day.app"
+  keys:
+    - "${BARK_KEY}"
+  group: "qqq-dca-signal"
+  is_archive: true
+  timeout_seconds: 10
+
 sim_trading:
   enabled: false
   order_amount: 100000
