@@ -4,11 +4,11 @@
 
 ## 项目定位
 
-`qqq-dca-signal` 是一个本地 macOS 定时运行的 A 股纳斯达克 100 / QQQ 等价 QDII-ETF 定投信号程序。
+`ndx-dca-signal` 是一个本地 macOS 定时运行的 A 股纳斯达克 100 / NDX 等价 QDII-ETF 定投信号程序。
 
 程序只负责：
 
-- 拉取 A 股基金、QQQ、NQ 行情。
+- 拉取 A 股基金、NDX、NQ 行情。
 - 根据明确规则计算 `BUY` / `SKIP_RULE` / `SKIP_DATA` / `SKIP_CALENDAR`。
 - 使用 LLM 解释规则结果。
 - 通过 Bark / PushPlus 推送信号，支持多 key / token。
@@ -41,7 +41,7 @@
 默认主策略是 `premium_plus_market`：
 
 - 先做动态溢价过滤。
-- 再做 QQQ/NQ 市场评分。
+- 再做 NDX/NQ 市场评分。
 - 市场评分低于阈值则不买。
 
 ## 数据源约定
@@ -51,7 +51,7 @@
 - A 股 ETF 实时价格 / IOPV：东方财富窄接口。
 - 历史溢价：HaoETF 优先。
 - HaoETF 缺失时：AkShare ETF 日线收盘价 + 历史单位净值生成近似历史溢价。
-- QQQ 日线：yfinance。
+- NDX 日线：yfinance。
 - NQ 实时 / 历史盘中：yfinance。
 
 关键数据缺失时，必须返回 `SKIP_DATA`，不要使用静默兜底、旧数据、默认假数据或 LLM 推断。
@@ -60,7 +60,7 @@
 
 回测支持两种市场评分模式：
 
-- `daily-proxy`：默认模式，适合一年以上回测。使用基金历史溢价和 QQQ 日频指标，NQ 盘中分量记为中性半分。
+- `daily-proxy`：默认模式，适合一年以上回测。使用基金历史溢价和 NDX 日频指标，NQ 盘中分量记为中性半分。
 - `intraday-strict`：严格模式，尝试使用 NQ 14:55 附近历史盘中数据。适合短期回测，或未来接入付费 NQ 历史盘中数据后使用。
 
 回测报告必须明确标注 `market_mode`，不要把 `daily-proxy` 解释为完整实盘口径。
@@ -68,14 +68,14 @@
 ## 常用命令
 
 ```bash
-uv run qqq-dca-signal show-config
-uv run qqq-dca-signal warm-cache
-uv run qqq-dca-signal run-daily --dry-run
-uv run qqq-dca-signal settle-sim-trades
-uv run qqq-dca-signal backtest --start 2025-07-01 --end 2026-06-30
-uv run qqq-dca-signal backtest --start 2026-06-01 --end 2026-06-30 --market-mode intraday-strict
-uv run qqq-dca-signal install-launchd
-uv run qqq-dca-signal uninstall-launchd
+uv run ndx-dca-signal show-config
+uv run ndx-dca-signal warm-cache
+uv run ndx-dca-signal run-daily --dry-run
+uv run ndx-dca-signal settle-sim-trades
+uv run ndx-dca-signal backtest --start 2025-07-01 --end 2026-06-30
+uv run ndx-dca-signal backtest --start 2026-06-01 --end 2026-06-30 --market-mode intraday-strict
+uv run ndx-dca-signal install-launchd
+uv run ndx-dca-signal uninstall-launchd
 ```
 
 ## 开发约定
@@ -96,8 +96,8 @@ uv run qqq-dca-signal uninstall-launchd
 文档或小改动可以运行轻量命令验证入口，例如：
 
 ```bash
-uv run qqq-dca-signal --help
-uv run qqq-dca-signal show-config
+uv run ndx-dca-signal --help
+uv run ndx-dca-signal show-config
 ```
 
 不要在没有用户要求时主动跑长周期回测、真实推送或带真实 LLM 的耗时命令。

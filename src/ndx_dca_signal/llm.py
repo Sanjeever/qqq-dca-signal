@@ -4,7 +4,7 @@ import json
 
 import httpx
 
-from qqq_dca_signal.models import SignalResult
+from ndx_dca_signal.models import SignalResult
 
 
 SYSTEM_PROMPT = """你是投资规则解释器，不是最终决策者。

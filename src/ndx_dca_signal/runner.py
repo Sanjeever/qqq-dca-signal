@@ -3,17 +3,17 @@ from __future__ import annotations
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from qqq_dca_signal.backtest import enabled_funds
-from qqq_dca_signal.cache import HistoryCache
-from qqq_dca_signal.config import resolve_project_path
-from qqq_dca_signal.data_sources import (
+from ndx_dca_signal.backtest import enabled_funds
+from ndx_dca_signal.cache import HistoryCache
+from ndx_dca_signal.config import resolve_project_path
+from ndx_dca_signal.data_sources import (
     AShareCalendar,
     AkShareClient,
     HaoEtfClient,
     YahooClient,
 )
-from qqq_dca_signal.models import SignalResult
-from qqq_dca_signal.rules import build_signal, calculate_market_score, evaluate_funds
+from ndx_dca_signal.models import SignalResult
+from ndx_dca_signal.rules import build_signal, calculate_market_score, evaluate_funds
 
 
 def fetch_history_for_fund(fund, haoetf: HaoEtfClient, akshare: AkShareClient):
@@ -94,9 +94,9 @@ class DailyRunner:
 
         evaluations = evaluate_funds(snapshots, histories, self.config)
         try:
-            qqq_history = self.yahoo.qqq_history(self.config["data_sources"]["qqq_symbol"])
+            ndx_history = self.yahoo.ndx_history(self.config["data_sources"]["ndx_symbol"])
             nq_change = self.yahoo.nq_realtime_change(self.config["data_sources"]["nq_symbol"])
-            market_score = calculate_market_score(qqq_history, nq_change, self.config)
+            market_score = calculate_market_score(ndx_history, nq_change, self.config)
         except Exception as exc:
             return SignalResult(
                 status="SKIP_DATA",

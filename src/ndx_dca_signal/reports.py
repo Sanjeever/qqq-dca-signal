@@ -11,7 +11,7 @@ def write_markdown_report(path: Path, summary: dict, rows: list[dict], params: d
     path.parent.mkdir(parents=True, exist_ok=True)
     frame = pd.DataFrame(rows)
     lines = [
-        "# QQQ 定投策略回测报告",
+        "# NDX 定投策略回测报告",
         "",
         "## 参数快照",
         "",
@@ -98,5 +98,5 @@ def write_html_report(path: Path, rows: list[dict]) -> None:
                 col=1,
             )
     fig.add_hline(y=60, line_dash="dash", row=4, col=1)
-    fig.update_layout(height=1100, title="QQQ 定投策略回测", hovermode="x unified")
+    fig.update_layout(height=1100, title="NDX 定投策略回测", hovermode="x unified")
     path.write_text(fig.to_html(full_html=True, include_plotlyjs="cdn"), encoding="utf-8")

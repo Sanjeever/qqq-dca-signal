@@ -5,10 +5,10 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from qqq_dca_signal.config import load_config, project_root
+from ndx_dca_signal.config import load_config, project_root
 
 
-BASE_LABEL = "com.sanjeev.qqq-dca-signal"
+BASE_LABEL = "com.sanjeev.ndx-dca-signal"
 OLD_PLIST_PATH = Path.home() / "Library" / "LaunchAgents" / f"{BASE_LABEL}.plist"
 WARM_CACHE_LABEL = f"{BASE_LABEL}.warm-cache"
 RUN_DAILY_LABEL = f"{BASE_LABEL}.run-daily"
@@ -31,7 +31,7 @@ def build_plist(label: str, command: str, hour: int, minute: int) -> dict:
         "ProgramArguments": [
             uv_path,
             "run",
-            "qqq-dca-signal",
+            "ndx-dca-signal",
             command,
         ],
         "WorkingDirectory": str(root),

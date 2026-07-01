@@ -9,16 +9,16 @@ import yaml
 from rich.console import Console
 from rich.table import Table
 
-from qqq_dca_signal.backtest import Backtester
-from qqq_dca_signal.config import load_config, mask_secrets, resolve_project_path
-from qqq_dca_signal.database import Database
-from qqq_dca_signal.launchd import install_launchd as install_launchd_plist
-from qqq_dca_signal.launchd import uninstall_launchd as uninstall_launchd_plist
-from qqq_dca_signal.llm import generate_analysis
-from qqq_dca_signal.notifier import send_notification
-from qqq_dca_signal.rules import render_signal_markdown
-from qqq_dca_signal.runner import DailyRunner, WarmCacheRunner, now_in_config_timezone
-from qqq_dca_signal.sim_trading import build_portfolio_summary, record_signal_trade, settle_pending_trades
+from ndx_dca_signal.backtest import Backtester
+from ndx_dca_signal.config import load_config, mask_secrets, resolve_project_path
+from ndx_dca_signal.database import Database
+from ndx_dca_signal.launchd import install_launchd as install_launchd_plist
+from ndx_dca_signal.launchd import uninstall_launchd as uninstall_launchd_plist
+from ndx_dca_signal.llm import generate_analysis
+from ndx_dca_signal.notifier import send_notification
+from ndx_dca_signal.rules import render_signal_markdown
+from ndx_dca_signal.runner import DailyRunner, WarmCacheRunner, now_in_config_timezone
+from ndx_dca_signal.sim_trading import build_portfolio_summary, record_signal_trade, settle_pending_trades
 
 
 app = typer.Typer(no_args_is_help=True)
@@ -56,14 +56,14 @@ def run_daily(
     loaded, database = prepare(config)
     run_at = datetime.fromisoformat(as_of) if as_of else now_in_config_timezone(loaded)
     start_content = (
-        "# QQQ定投信号：开始计算\n\n"
+        "# NDX定投信号：开始计算\n\n"
         f"- 时间：{run_at.isoformat()}\n"
         "- 状态：程序已启动，正在拉取行情并计算今日信号。"
     )
     if dry_run:
         console.print(start_content)
     else:
-        send_notification("QQQ定投信号：开始计算", start_content, loaded)
+        send_notification("NDX定投信号：开始计算", start_content, loaded)
 
     result = DailyRunner(loaded).run(run_at, dry_run=dry_run)
     if not dry_run:

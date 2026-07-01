@@ -4,7 +4,7 @@ import json
 import sqlite3
 from pathlib import Path
 
-from qqq_dca_signal.models import SignalResult, SimTrade
+from ndx_dca_signal.models import SignalResult, SimTrade
 
 
 SCHEMA = """

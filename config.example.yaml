@@ -1,7 +1,7 @@
 timezone: Asia/Shanghai
 
 paths:
-  database: data/qqq_dca.sqlite
+  database: data/ndx_dca.sqlite
   reports_dir: reports
 
 schedule:
@@ -91,12 +91,12 @@ market_score:
 
 hard_filters:
   nq_panic_change: -0.03
-  qqq_trend_break_ratio: 0.95
+  ndx_trend_break_ratio: 0.95
 
 data_sources:
   fund_realtime_primary: eastmoney_direct
   fund_history_primary: haoetf
-  qqq_symbol: QQQ
+  ndx_symbol: "^NDX"
   nq_symbol: NQ=F
 
 missing_data_policy:
@@ -126,7 +126,7 @@ bark:
   server_url: "https://api.day.app"
   keys:
     - "${BARK_KEY}"
-  group: "qqq-dca-signal"
+  group: "ndx-dca-signal"
   is_archive: true
   timeout_seconds: 10
 

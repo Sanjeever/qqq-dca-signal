@@ -3,10 +3,10 @@ from __future__ import annotations
 from datetime import datetime, time
 from zoneinfo import ZoneInfo
 
-from qqq_dca_signal.backtest import enabled_funds
-from qqq_dca_signal.data_sources import AkShareClient
-from qqq_dca_signal.database import Database
-from qqq_dca_signal.models import FundConfig, SignalResult, SimTrade
+from ndx_dca_signal.backtest import enabled_funds
+from ndx_dca_signal.data_sources import AkShareClient
+from ndx_dca_signal.database import Database
+from ndx_dca_signal.models import FundConfig, SignalResult, SimTrade
 
 
 def is_enabled(config: dict) -> bool:

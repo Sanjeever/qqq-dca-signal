@@ -15,7 +15,7 @@ import pandas as pd
 import yfinance as yf
 from bs4 import BeautifulSoup
 
-from qqq_dca_signal.models import FundConfig, FundHistoryRow, FundSnapshot
+from ndx_dca_signal.models import FundConfig, FundHistoryRow, FundSnapshot
 
 
 PERCENT_RE = re.compile(r"([-+]?\d+(?:\.\d+)?)%")
@@ -298,7 +298,7 @@ class EastMoneyClient:
 
 
 class YahooClient:
-    def qqq_history(self, symbol: str, lookback_days: int = 420) -> pd.DataFrame:
+    def ndx_history(self, symbol: str, lookback_days: int = 420) -> pd.DataFrame:
         frame = yf.download(symbol, period=f"{lookback_days}d", interval="1d", progress=False, auto_adjust=False)
         if frame.empty:
             raise ValueError(f"{symbol} daily history is empty")
@@ -306,7 +306,7 @@ class YahooClient:
             frame.columns = frame.columns.get_level_values(0)
         return frame.dropna(subset=["Close"])
 
-    def qqq_history_range(self, symbol: str, start: date, end: date, warmup_days: int = 420) -> pd.DataFrame:
+    def ndx_history_range(self, symbol: str, start: date, end: date, warmup_days: int = 420) -> pd.DataFrame:
         start_ts = pd.Timestamp(start) - pd.Timedelta(days=warmup_days)
         end_ts = pd.Timestamp(end) + pd.Timedelta(days=1)
         frame = yf.download(

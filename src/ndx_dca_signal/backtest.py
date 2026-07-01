@@ -6,10 +6,10 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
-from qqq_dca_signal.data_sources import AShareCalendar, AkShareClient, HaoEtfClient, YahooClient
-from qqq_dca_signal.models import FundConfig, FundHistoryRow
-from qqq_dca_signal.reports import write_html_report, write_markdown_report
-from qqq_dca_signal.rules import calculate_market_score, calculate_market_score_daily_proxy, quantile
+from ndx_dca_signal.data_sources import AShareCalendar, AkShareClient, HaoEtfClient, YahooClient
+from ndx_dca_signal.models import FundConfig, FundHistoryRow
+from ndx_dca_signal.reports import write_html_report, write_markdown_report
+from ndx_dca_signal.rules import calculate_market_score, calculate_market_score_daily_proxy, quantile
 
 
 STRATEGIES = ("daily_buy", "premium_only", "premium_plus_market")
@@ -46,8 +46,8 @@ class Backtester:
             code: {row.trade_date: row for row in rows}
             for code, rows in histories.items()
         }
-        qqq = self.yahoo.qqq_history_range(self.config["data_sources"]["qqq_symbol"], start, end)
-        qqq.index = pd.to_datetime(qqq.index).date
+        ndx = self.yahoo.ndx_history_range(self.config["data_sources"]["ndx_symbol"], start, end)
+        ndx.index = pd.to_datetime(ndx.index).date
 
         rows: list[dict] = []
         states = {
@@ -61,7 +61,7 @@ class Backtester:
             today_prices = {row.code: row.close for row in daily_candidates}
             selected_for_daily = self._lowest_premium(daily_candidates)
             selected_for_premium = self._premium_eligible(current, daily_candidates, histories)
-            market_score = self._market_score_for_date(current, qqq, market_mode)
+            market_score = self._market_score_for_date(current, ndx, market_mode)
 
             decisions = {
                 "daily_buy": selected_for_daily,
@@ -156,13 +156,13 @@ class Backtester:
             eligible.append(today)
         return self._lowest_premium(eligible)
 
-    def _market_score_for_date(self, current: date, qqq: pd.DataFrame, market_mode: str):
-        qqq_until_previous = qqq[qqq.index < current]
-        if qqq_until_previous.empty:
+    def _market_score_for_date(self, current: date, ndx: pd.DataFrame, market_mode: str):
+        ndx_until_previous = ndx[ndx.index < current]
+        if ndx_until_previous.empty:
             return None
         if market_mode == "daily-proxy":
             try:
-                return calculate_market_score_daily_proxy(qqq_until_previous, self.config)
+                return calculate_market_score_daily_proxy(ndx_until_previous, self.config)
             except Exception:
                 return None
         try:
@@ -173,7 +173,7 @@ class Backtester:
             )
             if nq_change is None:
                 return None
-            return calculate_market_score(qqq_until_previous, nq_change, self.config)
+            return calculate_market_score(ndx_until_previous, nq_change, self.config)
         except Exception:
             return None
 

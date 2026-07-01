@@ -56,7 +56,7 @@ def send_bark(title: str, content: str, config: dict) -> None:
     server_url = str(bark_config.get("server_url", "https://api.day.app")).rstrip("/")
     payload = {
         "body": content,
-        "group": bark_config.get("group", "qqq-dca-signal"),
+        "group": bark_config.get("group", "ndx-dca-signal"),
         "isArchive": "1" if bark_config.get("is_archive", True) else "0",
     }
     timeout = float(bark_config.get("timeout_seconds", 10))

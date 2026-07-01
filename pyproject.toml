@@ -1,7 +1,7 @@
 [project]
-name = "qqq-dca-signal"
+name = "ndx-dca-signal"
 version = "0.1.0"
-description = "A local macOS QQQ-linked A-share ETF DCA signal runner."
+description = "A local macOS NDX-linked A-share ETF DCA signal runner."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -20,7 +20,7 @@ dependencies = [
 ]
 
 [project.scripts]
-qqq-dca-signal = "qqq_dca_signal.cli:app"
+ndx-dca-signal = "ndx_dca_signal.cli:app"
 
 [build-system]
 requires = ["uv_build>=0.11.25,<0.12.0"]

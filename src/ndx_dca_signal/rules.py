@@ -4,7 +4,7 @@ from datetime import datetime
 
 import pandas as pd
 
-from qqq_dca_signal.models import FundEvaluation, FundHistoryRow, FundSnapshot, MarketScore, SignalResult
+from ndx_dca_signal.models import FundEvaluation, FundHistoryRow, FundSnapshot, MarketScore, SignalResult
 
 
 def percentile_rank(values: list[float], value: float) -> float:
@@ -105,10 +105,10 @@ def score_half_or_full(condition_full: bool, condition_partial: bool, weight: fl
     return 0.0
 
 
-def calculate_market_score(qqq_history: pd.DataFrame, nq_change: float, config: dict) -> MarketScore:
+def calculate_market_score(ndx_history: pd.DataFrame, nq_change: float, config: dict) -> MarketScore:
     score_config = config["market_score"]
     hard_config = config["hard_filters"]
-    close = qqq_history["Close"].astype(float)
+    close = ndx_history["Close"].astype(float)
 
     ma_days = int(score_config["medium_trend"]["ma_days"])
     rsi_days = int(score_config["overbought_control"]["rsi_days"])
@@ -117,7 +117,7 @@ def calculate_market_score(qqq_history: pd.DataFrame, nq_change: float, config: 
     vol_lookback = int(score_config["volatility_risk"]["percentile_lookback_days"])
 
     if len(close) < max(ma_days, rsi_days + 1, pullback_days + 1, vol_lookback + vol_days):
-        raise ValueError("QQQ history is not long enough for market score")
+        raise ValueError("NDX history is not long enough for market score")
 
     last_close = float(close.iloc[-1])
     ma = float(close.rolling(ma_days).mean().iloc[-1])
@@ -159,8 +159,8 @@ def calculate_market_score(qqq_history: pd.DataFrame, nq_change: float, config: 
     hard_filters: list[str] = []
     if nq_change <= float(hard_config["nq_panic_change"]):
         hard_filters.append(f"NQ 跌幅 {nq_change:.2%} 触发恐慌过滤")
-    if last_close < ma * float(hard_config["qqq_trend_break_ratio"]):
-        hard_filters.append("QQQ 跌破 MA120 * 0.95 趋势过滤")
+    if last_close < ma * float(hard_config["ndx_trend_break_ratio"]):
+        hard_filters.append("NDX 跌破 MA120 * 0.95 趋势过滤")
 
     total = sum(components.values())
     threshold = float(score_config["threshold"])
@@ -171,20 +171,20 @@ def calculate_market_score(qqq_history: pd.DataFrame, nq_change: float, config: 
         components=components,
         hard_filters=hard_filters,
         metrics={
-            "qqq_close": last_close,
-            "qqq_ma120": ma,
-            "qqq_3d_return": pullback,
-            "qqq_rsi14": rsi_value,
+            "ndx_close": last_close,
+            "ndx_ma120": ma,
+            "ndx_3d_return": pullback,
+            "ndx_rsi14": rsi_value,
             "nq_change": nq_change,
-            "qqq_volatility_percentile": vol_percentile,
+            "ndx_volatility_percentile": vol_percentile,
         },
     )
 
 
-def calculate_market_score_daily_proxy(qqq_history: pd.DataFrame, config: dict) -> MarketScore:
+def calculate_market_score_daily_proxy(ndx_history: pd.DataFrame, config: dict) -> MarketScore:
     score_config = config["market_score"]
     hard_config = config["hard_filters"]
-    close = qqq_history["Close"].astype(float)
+    close = ndx_history["Close"].astype(float)
 
     ma_days = int(score_config["medium_trend"]["ma_days"])
     rsi_days = int(score_config["overbought_control"]["rsi_days"])
@@ -193,7 +193,7 @@ def calculate_market_score_daily_proxy(qqq_history: pd.DataFrame, config: dict) 
     vol_lookback = int(score_config["volatility_risk"]["percentile_lookback_days"])
 
     if len(close) < max(ma_days, rsi_days + 1, pullback_days + 1, vol_lookback + vol_days):
-        raise ValueError("QQQ history is not long enough for market score")
+        raise ValueError("NDX history is not long enough for market score")
 
     last_close = float(close.iloc[-1])
     ma = float(close.rolling(ma_days).mean().iloc[-1])
@@ -229,8 +229,8 @@ def calculate_market_score_daily_proxy(qqq_history: pd.DataFrame, config: dict) 
     )
 
     hard_filters: list[str] = []
-    if last_close < ma * float(hard_config["qqq_trend_break_ratio"]):
-        hard_filters.append("QQQ 跌破 MA120 * 0.95 趋势过滤")
+    if last_close < ma * float(hard_config["ndx_trend_break_ratio"]):
+        hard_filters.append("NDX 跌破 MA120 * 0.95 趋势过滤")
 
     total = sum(components.values())
     threshold = float(score_config["threshold"])
@@ -241,12 +241,12 @@ def calculate_market_score_daily_proxy(qqq_history: pd.DataFrame, config: dict) 
         components=components,
         hard_filters=hard_filters,
         metrics={
-            "qqq_close": last_close,
-            "qqq_ma120": ma,
-            "qqq_3d_return": pullback,
-            "qqq_rsi14": rsi_value,
+            "ndx_close": last_close,
+            "ndx_ma120": ma,
+            "ndx_3d_return": pullback,
+            "ndx_rsi14": rsi_value,
             "nq_proxy_neutral_score": components["nq_intraday_position"],
-            "qqq_volatility_percentile": vol_percentile,
+            "ndx_volatility_percentile": vol_percentile,
         },
     )
 def build_signal(
