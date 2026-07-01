@@ -310,6 +310,18 @@ def build_signal(
     )
 
 
+def format_optional_money(value: float | None) -> str:
+    return "--" if value is None else f"{value:.2f}"
+
+
+def format_optional_price(value: float | None) -> str:
+    return "--" if value is None else f"{value:.4f}"
+
+
+def format_optional_percent(value: float | None) -> str:
+    return "--" if value is None else f"{value:.2%}"
+
+
 def render_signal_markdown(result: SignalResult) -> str:
     lines = [
         f"# {result.title}",
@@ -332,6 +344,83 @@ def render_signal_markdown(result: SignalResult) -> str:
 
     if result.llm_analysis:
         lines.extend(["", "## LLM 分析", result.llm_analysis])
+
+    if result.sim_trade:
+        trade = result.sim_trade
+        lines.extend(
+            [
+                "",
+                "## 模拟交易",
+                f"- 状态：{trade.status}",
+                f"- 基金：{trade.code} {trade.name}",
+                f"- 挂单时间：{trade.order_time.isoformat()}",
+                f"- 下单方式：{trade.order_price_type}",
+                f"- 下单金额：{trade.order_amount:.2f}",
+                f"- 模拟数量：{trade.quantity}",
+                f"- 价格参考：{trade.order_price_reference:.4f}",
+                f"- 说明：{trade.message}",
+            ]
+        )
+        if trade.fill_price is not None and trade.fill_amount is not None:
+            lines.extend(
+                [
+                    f"- 成交价：{trade.fill_price:.4f}",
+                    f"- 成交额：{trade.fill_amount:.2f}",
+                ]
+            )
+
+    if result.sim_portfolio:
+        portfolio = result.sim_portfolio
+        positions = portfolio["positions"]
+        recent_trades = portfolio["recent_trades"]
+        lines.extend(
+            [
+                "",
+                "## 模拟账户",
+                f"- 持仓基金数：{len(positions)}",
+                f"- 持仓成本：{format_optional_money(portfolio['total_cost'])}",
+                f"- 最新市值：{format_optional_money(portfolio['total_market_value'])}",
+                f"- 浮动盈亏：{format_optional_money(portfolio['total_pnl'])}",
+                f"- 浮动收益率：{format_optional_percent(portfolio['total_return'])}",
+                f"- 待结算挂单：{portfolio['pending_count']}",
+            ]
+        )
+        if positions:
+            lines.extend(
+                [
+                    "",
+                    "### 模拟持仓",
+                    "| 代码 | 名称 | 数量 | 成本 | 均价 | 最新价 | 市值 | 浮盈亏 | 收益率 |",
+                    "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+                ]
+            )
+            for item in positions:
+                lines.append(
+                    f"| {item['code']} | {item['name']} | {item['quantity']} | "
+                    f"{format_optional_money(item['cost'])} | {format_optional_price(item['avg_cost'])} | "
+                    f"{format_optional_price(item['mark_price'])} | {format_optional_money(item['market_value'])} | "
+                    f"{format_optional_money(item['pnl'])} | {format_optional_percent(item['return_rate'])} |"
+                )
+        else:
+            lines.extend(["", "### 模拟持仓", "暂无模拟持仓。"])
+
+        if recent_trades:
+            lines.extend(
+                [
+                    "",
+                    "### 最近模拟交易",
+                    "| 日期 | 代码 | 名称 | 状态 | 数量 | 下单金额 | 成交价 | 成交额 |",
+                    "| --- | --- | --- | --- | ---: | ---: | ---: | ---: |",
+                ]
+            )
+            for item in recent_trades:
+                lines.append(
+                    f"| {item['trade_date']} | {item['code']} | {item['name']} | {item['status']} | "
+                    f"{item['quantity']} | {format_optional_money(item['order_amount'])} | "
+                    f"{format_optional_price(item['fill_price'])} | {format_optional_money(item['fill_amount'])} |"
+                )
+        else:
+            lines.extend(["", "### 最近模拟交易", "暂无模拟交易。"])
 
     if result.market_score:
         lines.extend(

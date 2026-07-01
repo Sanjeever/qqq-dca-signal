@@ -13,6 +13,7 @@
 - 通过 OpenAI 兼容 API 生成规则解释。
 - 通过 PushPlus 推送 Markdown 信号。
 - 买入信号标题直接包含推荐基金代码和名称。
+- 可选开启本地模拟交易账本：买入信号发出后记录 14:57 挂涨停价模拟买入，15:10 按当日收盘价结算。
 - 使用 SQLite 保存历史缓存、每日信号和回测结果。
 - 生成 Markdown 和 Plotly HTML 回测报告。
 
@@ -40,12 +41,28 @@ pushplus:
 
 程序会向 `tokens` 列表里的每个 token 推送。
 
+模拟交易默认关闭。需要开启时在本地 `config.yaml` 中配置：
+
+```yaml
+sim_trading:
+  enabled: true
+  order_amount: 100000
+  order_time: "14:57:00"
+  settle_time: "15:10:00"
+  lot_size: 100
+```
+
+`lot_size` 是一手的份额数量。A 股 ETF 场内交易通常一手是 100 份，所以保持 `100` 即可。模拟数量按 `order_amount / 信号价格` 向下取整到 `lot_size` 的整数倍。
+
+这只是本地模拟账本，不连接券商，不会真实下单。`run-daily` 只在正式运行且信号为 `BUY` 时写入模拟挂单；`--dry-run` 不写模拟交易。15:10 使用 ETF 当日收盘价结算。
+
 ## 每日信号流程
 
 ```bash
 uv run qqq-dca-signal warm-cache
 uv run qqq-dca-signal run-daily --dry-run
 uv run qqq-dca-signal run-daily
+uv run qqq-dca-signal settle-sim-trades
 ```
 
 `warm-cache` 用于预热当天历史溢价缓存。`run-daily` 默认不再临时拉取全量历史数据；如果当天缓存缺失，会返回 `SKIP_DATA`，避免 14:55 信号路径变慢。
@@ -56,6 +73,8 @@ uv run qqq-dca-signal run-daily
 
 最终信号正文中，LLM 分析会放在前部；候选基金以 Markdown 表格展示。
 
+如果开启模拟交易，最终信号正文会增加“模拟账户”段，每天展示模拟持仓、持仓成本、最新市值、浮动盈亏、浮动收益率、待结算挂单和最近模拟交易。如果当天最终信号为 `BUY`，还会增加“模拟交易”段，展示本次模拟挂单时间、下单金额、数量和结算状态。
+
 ## 定时任务
 
 安装 macOS `launchd` 定时任务：
@@ -64,10 +83,13 @@ uv run qqq-dca-signal run-daily
 uv run qqq-dca-signal install-launchd
 ```
 
-该命令会安装两个任务：
+该命令会安装三个任务：
 
 - `14:40`：运行 `warm-cache`。
 - `14:55`：运行 `run-daily`。
+- `15:10`：运行 `settle-sim-trades`。
+
+三个时间分别来自 `config.yaml` 的 `schedule.warm_cache_time`、`schedule.run_time` 和 `sim_trading.settle_time`。修改普通策略、密钥、基金池配置不需要重新安装定时任务；修改这些运行时间后需要重新执行 `install-launchd`。
 
 卸载：
 
@@ -124,6 +146,8 @@ uv run qqq-dca-signal warm-cache --refresh
 uv run qqq-dca-signal run-daily --dry-run
 uv run qqq-dca-signal run-daily
 uv run qqq-dca-signal run-daily --as-of 2026-06-30T14:55:00+08:00 --dry-run
+uv run qqq-dca-signal settle-sim-trades
+uv run qqq-dca-signal settle-sim-trades --as-of 2026-06-30T15:10:00+08:00
 uv run qqq-dca-signal backtest --start 2025-07-01 --end 2026-06-30
 uv run qqq-dca-signal backtest --start 2026-06-01 --end 2026-06-30 --market-mode intraday-strict
 uv run qqq-dca-signal install-launchd

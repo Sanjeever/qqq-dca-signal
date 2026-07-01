@@ -4,7 +4,7 @@ import json
 import sqlite3
 from pathlib import Path
 
-from qqq_dca_signal.models import SignalResult
+from qqq_dca_signal.models import SignalResult, SimTrade
 
 
 SCHEMA = """
@@ -54,6 +54,25 @@ create table if not exists backtest_daily_results (
   buy_price real,
   portfolio_value real,
   payload_json text not null
+);
+
+create table if not exists sim_trades (
+  id integer primary key autoincrement,
+  signal_as_of text not null,
+  trade_date text not null,
+  order_time text not null,
+  code text not null,
+  name text not null,
+  order_amount real not null,
+  quantity integer not null,
+  order_price_type text not null,
+  order_price_reference real not null,
+  status text not null,
+  fill_price real,
+  fill_amount real,
+  message text not null default '',
+  created_at text not null default current_timestamp,
+  updated_at text not null default current_timestamp
 );
 """
 
@@ -112,6 +131,95 @@ class Database:
                         1 if s.cross_checked else 0,
                     ),
                 )
+
+    def record_sim_trade(self, trade: SimTrade) -> int:
+        with self.connect() as conn:
+            cursor = conn.execute(
+                """
+                insert into sim_trades (
+                  signal_as_of, trade_date, order_time, code, name, order_amount,
+                  quantity, order_price_type, order_price_reference, status,
+                  fill_price, fill_amount, message
+                ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    trade.signal_as_of.isoformat(),
+                    trade.trade_date.isoformat(),
+                    trade.order_time.isoformat(),
+                    trade.code,
+                    trade.name,
+                    trade.order_amount,
+                    trade.quantity,
+                    trade.order_price_type,
+                    trade.order_price_reference,
+                    trade.status,
+                    trade.fill_price,
+                    trade.fill_amount,
+                    trade.message,
+                ),
+            )
+            return int(cursor.lastrowid)
+
+    def pending_sim_trades(self, trade_date: str | None = None) -> list[dict]:
+        sql = "select * from sim_trades where status = 'SUBMITTED'"
+        params: tuple[str, ...] = ()
+        if trade_date is not None:
+            sql += " and trade_date = ?"
+            params = (trade_date,)
+        sql += " order by trade_date, id"
+        with self.connect() as conn:
+            conn.row_factory = sqlite3.Row
+            return [dict(row) for row in conn.execute(sql, params).fetchall()]
+
+    def sim_trades(self) -> list[dict]:
+        with self.connect() as conn:
+            conn.row_factory = sqlite3.Row
+            return [
+                dict(row)
+                for row in conn.execute(
+                    "select * from sim_trades order by trade_date, id"
+                ).fetchall()
+            ]
+
+    def recent_sim_trades(self, limit: int = 5) -> list[dict]:
+        with self.connect() as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                """
+                select * from sim_trades
+                order by trade_date desc, id desc
+                limit ?
+                """,
+                (limit,),
+            ).fetchall()
+            return [dict(row) for row in rows]
+
+    def fill_sim_trade(self, trade_id: int, fill_price: float, message: str) -> dict:
+        with self.connect() as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute("select * from sim_trades where id = ?", (trade_id,)).fetchone()
+            if row is None:
+                raise ValueError(f"sim trade {trade_id} not found")
+            quantity = int(row["quantity"])
+            fill_amount = fill_price * quantity
+            conn.execute(
+                """
+                update sim_trades
+                set status = 'FILLED',
+                    fill_price = ?,
+                    fill_amount = ?,
+                    message = ?,
+                    updated_at = current_timestamp
+                where id = ?
+                """,
+                (fill_price, fill_amount, message, trade_id),
+            )
+            updated = dict(row)
+            updated["status"] = "FILLED"
+            updated["fill_price"] = fill_price
+            updated["fill_amount"] = fill_amount
+            updated["message"] = message
+            return updated
 
     def record_backtest(
         self,

@@ -18,6 +18,7 @@ from qqq_dca_signal.llm import generate_analysis
 from qqq_dca_signal.pushplus import send_pushplus
 from qqq_dca_signal.rules import render_signal_markdown
 from qqq_dca_signal.runner import DailyRunner, WarmCacheRunner, now_in_config_timezone
+from qqq_dca_signal.sim_trading import build_portfolio_summary, record_signal_trade, settle_pending_trades
 
 
 app = typer.Typer(no_args_is_help=True)
@@ -65,6 +66,9 @@ def run_daily(
         send_pushplus("QQQ定投信号：开始计算", start_content, loaded)
 
     result = DailyRunner(loaded).run(run_at, dry_run=dry_run)
+    if not dry_run:
+        record_signal_trade(result, loaded, database)
+    result.sim_portfolio = build_portfolio_summary(result, loaded, database)
 
     try:
         analysis = generate_analysis(result, loaded)
@@ -109,6 +113,40 @@ def warm_cache(
     console.print(table)
     for error in result["errors"]:
         console.print(f"[red]{error}[/red]")
+
+
+@app.command("settle-sim-trades")
+def settle_sim_trades(
+    config: ConfigOption = None,
+    as_of: Annotated[
+        str | None,
+        typer.Option("--as-of", help="指定结算时间，例如 2026-06-30T15:10:00+08:00。"),
+    ] = None,
+) -> None:
+    loaded, database = prepare(config)
+    run_at = datetime.fromisoformat(as_of) if as_of else now_in_config_timezone(loaded)
+    settled = settle_pending_trades(loaded, database, run_at)
+    if not settled:
+        console.print("没有待结算的模拟交易。")
+        return
+
+    table = Table(title="模拟交易结算")
+    table.add_column("日期")
+    table.add_column("代码")
+    table.add_column("名称")
+    table.add_column("数量", justify="right")
+    table.add_column("成交价", justify="right")
+    table.add_column("成交额", justify="right")
+    for item in settled:
+        table.add_row(
+            str(item["trade_date"]),
+            str(item["code"]),
+            str(item["name"]),
+            str(item["quantity"]),
+            f"{float(item['fill_price']):.4f}",
+            f"{float(item['fill_amount']):.2f}",
+        )
+    console.print(table)
 
 
 @app.command("backtest")

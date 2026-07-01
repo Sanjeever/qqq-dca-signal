@@ -60,6 +60,23 @@ class MarketScore:
 
 
 @dataclass
+class SimTrade:
+    status: str
+    trade_date: date
+    code: str
+    name: str
+    order_time: datetime
+    order_amount: float
+    quantity: int
+    order_price_type: str
+    order_price_reference: float
+    signal_as_of: datetime
+    fill_price: float | None = None
+    fill_amount: float | None = None
+    message: str = ""
+
+
+@dataclass
 class SignalResult:
     status: SignalStatus
     as_of: datetime
@@ -69,6 +86,8 @@ class SignalResult:
     reasons: list[str]
     llm_analysis: str = ""
     dry_run: bool = False
+    sim_trade: SimTrade | None = None
+    sim_portfolio: dict[str, Any] | None = None
 
     @property
     def title(self) -> str:

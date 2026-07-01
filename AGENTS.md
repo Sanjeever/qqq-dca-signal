@@ -12,11 +12,12 @@
 - 根据明确规则计算 `BUY` / `SKIP_RULE` / `SKIP_DATA` / `SKIP_CALENDAR`。
 - 使用 LLM 解释规则结果。
 - 通过 PushPlus 推送信号，支持一个或多个 token。
-- 写入 SQLite 审计记录和回测记录。
+- 写入 SQLite 审计记录、回测记录和本地模拟交易记录。
 
 程序不负责：
 
 - 自动下单。
+- 连接券商真实交易接口。
 - 管理资金规模。
 - 自动覆盖规则信号。
 - 用 LLM 猜测缺失数据。
@@ -25,10 +26,14 @@
 
 - A 股交易日 14:40 运行 `warm-cache`，预热历史溢价缓存。
 - A 股交易日 14:55 运行 `run-daily`，只拉实时行情和市场数据。
+- A 股交易日 15:10 运行 `settle-sim-trades`，对本地模拟挂单按收盘价结算。
+- `launchd` 安装时从 `config.yaml` 读取运行时间；修改运行时间后需要重新安装 launchd。
 - `run-daily` 正式运行开始时先推送“开始计算”，完成后再推送最终信号。
 - 如果最终信号为 `BUY`，PushPlus 标题必须包含推荐基金代码和名称。
 - 最终信号正文中，LLM 分析应靠前展示，候选基金使用 Markdown 表格。
+- 如果开启本地模拟交易，最终信号正文应展示模拟账户摘要、模拟持仓和最近模拟交易。
 - 用户如收到买入信号，按自己的策略在 14:57 挂涨停价买入。
+- 如果开启本地模拟交易，`run-daily` 只在正式运行且 `BUY` 时记录模拟 14:57 挂涨停价买入；`--dry-run` 不写模拟交易。
 - 回测成交价使用当日收盘价。
 - 每日最多发出一次买入信号。
 - 每日只选择一只最优基金。
@@ -66,6 +71,7 @@
 uv run qqq-dca-signal show-config
 uv run qqq-dca-signal warm-cache
 uv run qqq-dca-signal run-daily --dry-run
+uv run qqq-dca-signal settle-sim-trades
 uv run qqq-dca-signal backtest --start 2025-07-01 --end 2026-06-30
 uv run qqq-dca-signal backtest --start 2026-06-01 --end 2026-06-30 --market-mode intraday-strict
 uv run qqq-dca-signal install-launchd

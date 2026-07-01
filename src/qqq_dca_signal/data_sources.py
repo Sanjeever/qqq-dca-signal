@@ -256,6 +256,24 @@ class AkShareClient:
             )
         return sorted(rows, key=lambda item: item.trade_date)
 
+    def fetch_fund_close(self, fund: FundConfig, trade_date: date) -> float:
+        symbol = f"{fund.market.lower()}{fund.code}"
+        price_frame = quiet_call(ak.fund_etf_hist_sina, symbol=symbol)
+        required_columns = {"date", "close"}
+        missing_columns = required_columns - set(price_frame.columns)
+        if missing_columns:
+            raise ValueError(f"AkShare ETF history missing columns: {sorted(missing_columns)}")
+
+        frame = price_frame[["date", "close"]].copy()
+        frame["trade_date"] = pd.to_datetime(frame["date"]).dt.date
+        matched = frame[frame["trade_date"] == trade_date]
+        if matched.empty:
+            raise ValueError(f"{fund.code} missing close price for {trade_date.isoformat()}")
+        close = parse_number(matched.iloc[-1]["close"])
+        if close is None or close <= 0:
+            raise ValueError(f"{fund.code} invalid close price for {trade_date.isoformat()}")
+        return close
+
 
 class EastMoneyClient:
     def __init__(self, timeout_seconds: int = 10) -> None:

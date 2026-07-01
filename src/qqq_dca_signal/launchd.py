@@ -5,13 +5,14 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from qqq_dca_signal.config import project_root
+from qqq_dca_signal.config import load_config, project_root
 
 
 BASE_LABEL = "com.sanjeev.qqq-dca-signal"
 OLD_PLIST_PATH = Path.home() / "Library" / "LaunchAgents" / f"{BASE_LABEL}.plist"
 WARM_CACHE_LABEL = f"{BASE_LABEL}.warm-cache"
 RUN_DAILY_LABEL = f"{BASE_LABEL}.run-daily"
+SETTLE_SIM_TRADES_LABEL = f"{BASE_LABEL}.settle-sim-trades"
 
 
 def plist_path(label: str) -> Path:
@@ -40,10 +41,22 @@ def build_plist(label: str, command: str, hour: int, minute: int) -> dict:
     }
 
 
+def parse_hour_minute(value: str) -> tuple[int, int]:
+    parts = value.split(":")
+    if len(parts) < 2:
+        raise ValueError(f"invalid launchd time: {value}")
+    return int(parts[0]), int(parts[1])
+
+
 def install_launchd() -> list[Path]:
+    config = load_config(None)
+    warm_hour, warm_minute = parse_hour_minute(str(config["schedule"].get("warm_cache_time", "14:40:00")))
+    run_hour, run_minute = parse_hour_minute(str(config["schedule"].get("run_time", "14:55:00")))
+    settle_hour, settle_minute = parse_hour_minute(str(config.get("sim_trading", {}).get("settle_time", "15:10:00")))
     jobs = [
-        (WARM_CACHE_LABEL, "warm-cache", 14, 40),
-        (RUN_DAILY_LABEL, "run-daily", 14, 55),
+        (WARM_CACHE_LABEL, "warm-cache", warm_hour, warm_minute),
+        (RUN_DAILY_LABEL, "run-daily", run_hour, run_minute),
+        (SETTLE_SIM_TRADES_LABEL, "settle-sim-trades", settle_hour, settle_minute),
     ]
     paths = []
     OLD_PLIST_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -61,7 +74,12 @@ def install_launchd() -> list[Path]:
 
 
 def uninstall_launchd() -> list[Path]:
-    paths = [OLD_PLIST_PATH, plist_path(WARM_CACHE_LABEL), plist_path(RUN_DAILY_LABEL)]
+    paths = [
+        OLD_PLIST_PATH,
+        plist_path(WARM_CACHE_LABEL),
+        plist_path(RUN_DAILY_LABEL),
+        plist_path(SETTLE_SIM_TRADES_LABEL),
+    ]
     removed = []
     for path in paths:
         if path.exists():
