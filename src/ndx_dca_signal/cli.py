@@ -15,6 +15,7 @@ from ndx_dca_signal.database import Database
 from ndx_dca_signal.launchd import install_launchd as install_launchd_plist
 from ndx_dca_signal.launchd import uninstall_launchd as uninstall_launchd_plist
 from ndx_dca_signal.llm import generate_analysis
+from ndx_dca_signal.news import fetch_news_context
 from ndx_dca_signal.notifier import send_notification
 from ndx_dca_signal.rules import render_signal_markdown
 from ndx_dca_signal.runner import DailyRunner, WarmCacheRunner, now_in_config_timezone
@@ -69,6 +70,11 @@ def run_daily(
     if not dry_run:
         record_signal_trade(result, loaded, database)
     result.sim_portfolio = build_portfolio_summary(result, loaded, database)
+
+    try:
+        result.news_context = fetch_news_context(loaded)
+    except Exception as exc:
+        result.news_errors.append(f"新闻上下文获取失败：{exc}")
 
     try:
         analysis = generate_analysis(result, loaded)

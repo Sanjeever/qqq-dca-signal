@@ -343,6 +343,25 @@ def render_signal_markdown(result: SignalResult) -> str:
     if result.llm_analysis:
         lines.extend(["", "## LLM 分析", result.llm_analysis])
 
+    if result.news_context or result.news_errors:
+        lines.extend(["", "## 新闻上下文"])
+        if result.news_errors:
+            for error in result.news_errors:
+                lines.append(f"- {error}")
+        for item in result.news_context:
+            content = str(item.get("content", "")).strip()
+            if not content:
+                continue
+            preview = content[:1000]
+            if len(content) > len(preview):
+                preview += "..."
+            lines.extend(
+                [
+                    f"### {item.get('query', '新闻查询')}",
+                    preview,
+                ]
+            )
+
     if result.sim_trade:
         trade = result.sim_trade
         lines.extend(

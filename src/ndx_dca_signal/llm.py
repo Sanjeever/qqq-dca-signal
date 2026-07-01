@@ -14,6 +14,9 @@ SYSTEM_PROMPT = """你是投资规则解释器，不是最终决策者。
 不得使用确定性收益表达。
 不得编造缺失数据。
 如果数据不足，明确说明数据不足导致不发买入信号。
+如果提供了新闻上下文，只能用于补充风险解释和与规则指标相互印证。
+不得因为新闻上下文而改变 signal。
+新闻上下文可能有噪音、重复或过期，必须谨慎表述，不得夸大。
 输出应简洁、克制、可审计。"""
 
 
@@ -31,6 +34,8 @@ def build_payload(result: SignalResult) -> dict:
         "market_score_breakdown": result.market_score.components if result.market_score else None,
         "hard_filters": result.market_score.hard_filters if result.market_score else [],
         "reasons": result.reasons,
+        "news_context": result.news_context,
+        "news_errors": result.news_errors,
     }
 
 

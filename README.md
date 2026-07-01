@@ -11,6 +11,7 @@
 - 使用 NDX/NQ 市场评分，低于阈值则不买。
 - 每日只选择一只最优基金。
 - 通过 OpenAI 兼容 API 生成规则解释。
+- 可选使用 AnySearch 拉取新闻上下文，供 LLM 补充风险解释。
 - 通过 Bark / PushPlus 推送 Markdown 信号。
 - 买入信号标题直接包含推荐基金代码和名称。
 - 可选开启本地模拟交易账本：买入信号发出后记录 14:57 挂涨停价模拟买入，15:10 按当日收盘价结算。
@@ -54,6 +55,24 @@ pushplus:
 
 如果 Bark 和 PushPlus 同时开启，程序会向所有已开启通道推送。
 
+新闻上下文默认关闭。需要让 LLM 结合近期新闻分析时，在本地 `config.yaml` 中开启并填入 `ANYSEARCH_API_KEY`：
+
+```yaml
+news:
+  enabled: true
+  provider: anysearch
+  endpoint: "https://api.anysearch.com/mcp"
+  api_key: "${ANYSEARCH_API_KEY}"
+  lookback_hours: 24
+  max_results: 6
+  queries:
+    - "Nasdaq 100 纳斯达克100 科技股"
+    - "Nvidia Microsoft Apple Meta Amazon Tesla Nasdaq news"
+    - "Federal Reserve CPI nonfarm payrolls Nasdaq risk"
+```
+
+新闻只作为 LLM 分析上下文，不参与 `BUY` / `SKIP` 规则判断，也不能覆盖规则信号。
+
 模拟交易默认关闭。需要开启时在本地 `config.yaml` 中配置：
 
 ```yaml
@@ -85,6 +104,8 @@ uv run ndx-dca-signal settle-sim-trades
 正式运行 `run-daily` 时，程序会先推送一条“开始计算”消息；计算完成后再推送最终买入或不买结论。`--dry-run` 只在终端打印，不发送推送。
 
 最终信号正文中，LLM 分析会放在前部；候选基金以 Markdown 表格展示。
+
+如果开启新闻上下文，最终信号正文会显示“新闻上下文”段，LLM 分析也会结合新闻解释风险，但不会改变规则信号。
 
 如果开启模拟交易，最终信号正文会增加“模拟账户”段，每天展示模拟持仓、持仓成本、最新市值、浮动盈亏、浮动收益率、待结算挂单和最近模拟交易。如果当天最终信号为 `BUY`，还会增加“模拟交易”段，展示本次模拟挂单时间、下单金额、数量和结算状态。
 

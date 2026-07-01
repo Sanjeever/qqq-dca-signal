@@ -18,6 +18,7 @@
 - 关键数据缺失、过期、交叉校验异常时不发买入信号。
 - 回测信号只使用当时可见数据，成交使用基金收盘价。
 - 回测不调用 LLM。
+- 新闻上下文只供 LLM 做风险解释，不参与规则决策。
 - 模拟交易只在正式 `run-daily` 且信号为 `BUY` 时记录挂单；`--dry-run` 不写模拟交易。
 
 ## 信号流程
@@ -32,8 +33,32 @@
 8. 若硬过滤触发或评分低于阈值，则不买。
 9. 若通过所有规则，则发 BUY 信号。
 10. 如果开启模拟交易，写入一笔 14:57 挂涨停价的本地模拟挂单。
-11. 生成推送 Markdown，LLM 只追加解释。
-12. 写入 SQLite 审计记录。
+11. 如果开启新闻上下文，使用 AnySearch 拉取近期相关新闻。
+12. 生成推送 Markdown，LLM 只追加解释。
+13. 写入 SQLite 审计记录。
+
+## 新闻上下文
+
+新闻上下文是可选解释层，不是交易规则。
+
+```yaml
+news:
+  enabled: false
+  provider: anysearch
+  endpoint: "https://api.anysearch.com/mcp"
+  api_key: "${ANYSEARCH_API_KEY}"
+  lookback_hours: 24
+  max_results: 6
+  max_chars: 6000
+  timeout_seconds: 15
+```
+
+原则：
+
+- 只有 `news.enabled: true` 且 `api_key` 非空时才拉取新闻。
+- 新闻抓取失败不会阻塞规则信号，只会在推送中显示新闻上下文获取失败。
+- LLM 可以使用新闻解释风险、事件和指标的关系，但不得改变 `BUY` / `SKIP` 信号。
+- 若新闻长期证明有稳定决策价值，应沉淀成明确规则，而不是让 LLM 临场决策。
 
 ## 模拟交易
 

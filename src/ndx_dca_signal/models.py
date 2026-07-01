@@ -88,6 +88,8 @@ class SignalResult:
     dry_run: bool = False
     sim_trade: SimTrade | None = None
     sim_portfolio: dict[str, Any] | None = None
+    news_context: list[dict[str, Any]] = field(default_factory=list)
+    news_errors: list[str] = field(default_factory=list)
 
     @property
     def title(self) -> str:
@@ -110,4 +112,6 @@ class SignalResult:
             "market_score": self.market_score.total if self.market_score else None,
             "reasons": self.reasons,
             "dry_run": self.dry_run,
+            "news_context": self.news_context,
+            "news_errors": self.news_errors,
         }

@@ -112,6 +112,20 @@ llm:
   timeout_seconds: 20
   fail_policy: "use_rule_summary_only"
 
+news:
+  enabled: false
+  provider: anysearch
+  endpoint: "https://api.anysearch.com/mcp"
+  api_key: "${ANYSEARCH_API_KEY}"
+  lookback_hours: 24
+  max_results: 6
+  max_chars: 6000
+  timeout_seconds: 15
+  queries:
+    - "Nasdaq 100 纳斯达克100 科技股"
+    - "Nvidia Microsoft Apple Meta Amazon Tesla Nasdaq news"
+    - "Federal Reserve CPI nonfarm payrolls Nasdaq risk"
+
 pushplus:
   enabled: false
   tokens:
