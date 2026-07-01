@@ -9,7 +9,7 @@ from typing import Any
 import yaml
 
 
-SECRET_KEYS = {"api_key", "token", "tokens", "apikey", "password", "secret"}
+SECRET_KEYS = {"api_key", "token", "tokens", "key", "keys", "apikey", "password", "secret"}
 ENV_PATTERN = re.compile(r"^\$\{([A-Z0-9_]+)\}$")
 
 

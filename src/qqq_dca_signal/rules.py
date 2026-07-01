@@ -135,6 +135,50 @@ def calculate_market_score(qqq_history: pd.DataFrame, nq_change: float, config: 
         ma * 0.98 <= last_close <= ma * 1.02,
         float(score_config["medium_trend"]["weight"]),
     )
+    components["short_pullback"] = score_half_or_full(
+        -0.05 <= pullback <= -0.005,
+        (-0.08 <= pullback < -0.05) or (-0.005 < pullback <= 0.01),
+        float(score_config["short_pullback"]["weight"]),
+    )
+    components["overbought_control"] = score_half_or_full(
+        rsi_value <= 65,
+        65 < rsi_value < 75,
+        float(score_config["overbought_control"]["weight"]),
+    )
+    components["nq_intraday_position"] = score_half_or_full(
+        -0.015 <= nq_change <= 0.005,
+        (-0.025 <= nq_change < -0.015) or (0.005 < nq_change <= 0.01),
+        float(score_config["nq_intraday_position"]["weight"]),
+    )
+    components["volatility_risk"] = score_half_or_full(
+        vol_percentile <= 0.70,
+        0.70 < vol_percentile <= 0.85,
+        float(score_config["volatility_risk"]["weight"]),
+    )
+
+    hard_filters: list[str] = []
+    if nq_change <= float(hard_config["nq_panic_change"]):
+        hard_filters.append(f"NQ 跌幅 {nq_change:.2%} 触发恐慌过滤")
+    if last_close < ma * float(hard_config["qqq_trend_break_ratio"]):
+        hard_filters.append("QQQ 跌破 MA120 * 0.95 趋势过滤")
+
+    total = sum(components.values())
+    threshold = float(score_config["threshold"])
+    return MarketScore(
+        total=total,
+        threshold=threshold,
+        passed=total >= threshold and not hard_filters,
+        components=components,
+        hard_filters=hard_filters,
+        metrics={
+            "qqq_close": last_close,
+            "qqq_ma120": ma,
+            "qqq_3d_return": pullback,
+            "qqq_rsi14": rsi_value,
+            "nq_change": nq_change,
+            "qqq_volatility_percentile": vol_percentile,
+        },
+    )
 
 
 def calculate_market_score_daily_proxy(qqq_history: pd.DataFrame, config: dict) -> MarketScore:
@@ -205,52 +249,6 @@ def calculate_market_score_daily_proxy(qqq_history: pd.DataFrame, config: dict) 
             "qqq_volatility_percentile": vol_percentile,
         },
     )
-    components["short_pullback"] = score_half_or_full(
-        -0.05 <= pullback <= -0.005,
-        (-0.08 <= pullback < -0.05) or (-0.005 < pullback <= 0.01),
-        float(score_config["short_pullback"]["weight"]),
-    )
-    components["overbought_control"] = score_half_or_full(
-        rsi_value <= 65,
-        65 < rsi_value < 75,
-        float(score_config["overbought_control"]["weight"]),
-    )
-    components["nq_intraday_position"] = score_half_or_full(
-        -0.015 <= nq_change <= 0.005,
-        (-0.025 <= nq_change < -0.015) or (0.005 < nq_change <= 0.01),
-        float(score_config["nq_intraday_position"]["weight"]),
-    )
-    components["volatility_risk"] = score_half_or_full(
-        vol_percentile <= 0.70,
-        0.70 < vol_percentile <= 0.85,
-        float(score_config["volatility_risk"]["weight"]),
-    )
-
-    hard_filters: list[str] = []
-    if nq_change <= float(hard_config["nq_panic_change"]):
-        hard_filters.append(f"NQ 跌幅 {nq_change:.2%} 触发恐慌过滤")
-    if last_close < ma * float(hard_config["qqq_trend_break_ratio"]):
-        hard_filters.append("QQQ 跌破 MA120 * 0.95 趋势过滤")
-
-    total = sum(components.values())
-    threshold = float(score_config["threshold"])
-    return MarketScore(
-        total=total,
-        threshold=threshold,
-        passed=total >= threshold and not hard_filters,
-        components=components,
-        hard_filters=hard_filters,
-        metrics={
-            "qqq_close": last_close,
-            "qqq_ma120": ma,
-            "qqq_3d_return": pullback,
-            "qqq_rsi14": rsi_value,
-            "nq_change": nq_change,
-            "qqq_volatility_percentile": vol_percentile,
-        },
-    )
-
-
 def build_signal(
     as_of: datetime,
     evaluations: list[FundEvaluation],
