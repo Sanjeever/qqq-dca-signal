@@ -194,6 +194,14 @@ class Database:
             ).fetchall()
             return [dict(row) for row in rows]
 
+    def has_sim_trade_on(self, trade_date: str) -> bool:
+        with self.connect() as conn:
+            row = conn.execute(
+                "select 1 from sim_trades where trade_date = ? limit 1",
+                (trade_date,),
+            ).fetchone()
+            return row is not None
+
     def fill_sim_trade(self, trade_id: int, fill_price: float, message: str) -> dict:
         with self.connect() as conn:
             conn.row_factory = sqlite3.Row

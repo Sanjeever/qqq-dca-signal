@@ -62,6 +62,8 @@ def record_signal_trade(result: SignalResult, config: dict, database: Database) 
     trade = build_sim_trade(result, config)
     if trade is None:
         return None
+    if database.has_sim_trade_on(trade.trade_date.isoformat()):
+        return None
     database.record_sim_trade(trade)
     result.sim_trade = trade
     return trade

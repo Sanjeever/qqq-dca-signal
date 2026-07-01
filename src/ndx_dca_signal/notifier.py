@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+import sys
 from urllib.parse import quote
 
 import httpx
+
+
+DEFAULT_BARK_MAX_BODY_BYTES = 3500
+BARK_TRUNCATED_SUFFIX = "\n\n[Bark 摘要已截断，完整内容请看 PushPlus 或本地日志。]"
 
 
 def configured_tokens(push_config: dict) -> list[str]:
@@ -45,6 +50,35 @@ def configured_bark_keys(bark_config: dict) -> list[str]:
     return [str(key) for key in keys if str(key).strip()]
 
 
+def truncate_utf8(text: str, max_bytes: int) -> str:
+    encoded = text.encode("utf-8")
+    if len(encoded) <= max_bytes:
+        return text
+    return encoded[:max_bytes].decode("utf-8", errors="ignore")
+
+
+def bark_body(content: str, bark_config: dict) -> str:
+    max_bytes = int(bark_config.get("max_body_bytes", DEFAULT_BARK_MAX_BODY_BYTES))
+    if len(content.encode("utf-8")) <= max_bytes:
+        return content
+
+    allowed = max(0, max_bytes - len(BARK_TRUNCATED_SUFFIX.encode("utf-8")))
+    lines = content.splitlines()
+    compact_lines: list[str] = []
+    keep = True
+    skipped_sections = {"## LLM 分析", "## 候选基金", "## 新闻上下文"}
+    for line in lines:
+        if line.startswith("## "):
+            keep = line not in skipped_sections
+        if keep:
+            compact_lines.append(line)
+
+    compact = "\n".join(compact_lines).strip()
+    if not compact:
+        compact = content
+    return truncate_utf8(compact, allowed).rstrip() + BARK_TRUNCATED_SUFFIX
+
+
 def send_bark(title: str, content: str, config: dict) -> None:
     bark_config = config.get("bark", {})
     if not bark_config.get("enabled"):
@@ -55,7 +89,7 @@ def send_bark(title: str, content: str, config: dict) -> None:
 
     server_url = str(bark_config.get("server_url", "https://api.day.app")).rstrip("/")
     payload = {
-        "body": content,
+        "body": bark_body(content, bark_config),
         "group": bark_config.get("group", "ndx-dca-signal"),
         "isArchive": "1" if bark_config.get("is_archive", True) else "0",
     }
@@ -71,5 +105,24 @@ def send_bark(title: str, content: str, config: dict) -> None:
 
 
 def send_notification(title: str, content: str, config: dict) -> None:
-    send_pushplus(title, content, config)
-    send_bark(title, content, config)
+    sent = False
+    errors: list[str] = []
+
+    if config.get("pushplus", {}).get("enabled"):
+        try:
+            send_pushplus(title, content, config)
+            sent = True
+        except Exception as exc:
+            errors.append(f"PushPlus failed: {exc}")
+
+    if config.get("bark", {}).get("enabled"):
+        try:
+            send_bark(title, content, config)
+            sent = True
+        except Exception as exc:
+            errors.append(f"Bark failed: {exc}")
+
+    if errors and sent:
+        print("；".join(errors), file=sys.stderr)
+    if errors and not sent:
+        raise RuntimeError("；".join(errors))
