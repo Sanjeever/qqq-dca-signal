@@ -14,7 +14,7 @@
 - 可选使用 AnySearch 拉取新闻上下文，供 LLM 补充风险解释。
 - 通过 Bark / PushPlus 推送 Markdown 信号。
 - 推送标题保持简短：`NDX开始计算`、`NDX今日不买`、`NDX买${基金代码}`。
-- 可选开启本地模拟交易账本：买入信号发出后记录 14:57 挂涨停价模拟买入，18:30 按当日收盘价结算。
+- 可选开启本地模拟交易账本：买入信号发出后记录 14:57 挂涨停价模拟买入，22:30 按当日收盘价结算。
 - 使用 SQLite 保存历史缓存、每日信号和回测结果。
 - 生成 Markdown 和 Plotly HTML 回测报告。
 
@@ -80,13 +80,13 @@ sim_trading:
   enabled: true
   order_amount: 100000
   order_time: "14:57:00"
-  settle_time: "18:30:00"
+  settle_time: "22:30:00"
   lot_size: 100
 ```
 
 `lot_size` 是一手的份额数量。A 股 ETF 场内交易通常一手是 100 份，所以保持 `100` 即可。模拟数量按 `order_amount / 信号价格` 向下取整到 `lot_size` 的整数倍。
 
-这只是本地模拟账本，不连接券商，不会真实下单。`run-daily` 只在正式运行且信号为 `BUY` 时写入模拟挂单；`--dry-run` 不写模拟交易。18:30 使用 ETF 当日收盘价结算。若当天数据源未更新，待结算单会保留为 `SUBMITTED`，后续结算任务会继续处理历史待结算单。
+这只是本地模拟账本，不连接券商，不会真实下单。`run-daily` 只在正式运行且信号为 `BUY` 时写入模拟挂单；`--dry-run` 不写模拟交易。22:30 使用 ETF 当日收盘价结算。若当天数据源未更新，待结算单会保留为 `SUBMITTED`，后续结算任务会继续处理历史待结算单。
 
 ## 每日信号流程
 
@@ -121,7 +121,7 @@ uv run ndx-dca-signal install-launchd
 
 - `14:40`：运行 `warm-cache`。
 - `14:55`：运行 `run-daily`。
-- `18:30`：运行 `settle-sim-trades`。
+- `22:30`：运行 `settle-sim-trades`。
 
 三个时间分别来自 `config.yaml` 的 `schedule.warm_cache_time`、`schedule.run_time` 和 `sim_trading.settle_time`。修改普通策略、密钥、基金池配置不需要重新安装定时任务；修改这些运行时间后需要重新执行 `install-launchd`。
 
@@ -181,7 +181,7 @@ uv run ndx-dca-signal run-daily --dry-run
 uv run ndx-dca-signal run-daily
 uv run ndx-dca-signal run-daily --as-of 2026-06-30T14:55:00+08:00 --dry-run
 uv run ndx-dca-signal settle-sim-trades
-uv run ndx-dca-signal settle-sim-trades --as-of 2026-06-30T18:30:00+08:00
+uv run ndx-dca-signal settle-sim-trades --as-of 2026-06-30T22:30:00+08:00
 uv run ndx-dca-signal backtest --start 2025-07-01 --end 2026-06-30
 uv run ndx-dca-signal backtest --start 2026-06-01 --end 2026-06-30 --market-mode intraday-strict
 uv run ndx-dca-signal install-launchd
