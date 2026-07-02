@@ -96,13 +96,9 @@ class SignalResult:
         if self.status == "BUY":
             if self.selected_fund:
                 s = self.selected_fund.snapshot
-                return f"NDX定投信号：今日可买 {s.code} {s.name}"
-            return "NDX定投信号：今日可买"
-        if self.status == "SKIP_DATA":
-            return "NDX定投信号：数据不足，今日不发买入信号"
-        if self.status == "SKIP_CALENDAR":
-            return "NDX定投信号：非A股交易日"
-        return "NDX定投信号：今日不买"
+                return f"NDX买{s.code}"
+            return "NDX买"
+        return "NDX今日不买"
 
     def to_record(self) -> dict[str, Any]:
         return {

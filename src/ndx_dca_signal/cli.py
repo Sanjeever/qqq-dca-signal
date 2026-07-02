@@ -57,14 +57,14 @@ def run_daily(
     loaded, database = prepare(config)
     run_at = datetime.fromisoformat(as_of) if as_of else now_in_config_timezone(loaded)
     start_content = (
-        "# NDX定投信号：开始计算\n\n"
+        "# NDX开始计算\n\n"
         f"- 时间：{run_at.isoformat()}\n"
         "- 状态：程序已启动，正在拉取行情并计算今日信号。"
     )
     if dry_run:
         console.print(start_content)
     else:
-        send_notification("NDX定投信号：开始计算", start_content, loaded)
+        send_notification("NDX开始计算", start_content, loaded)
 
     result = DailyRunner(loaded).run(run_at, dry_run=dry_run)
     if not dry_run:

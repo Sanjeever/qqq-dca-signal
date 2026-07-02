@@ -66,7 +66,7 @@ def bark_body(content: str, bark_config: dict) -> str:
     lines = content.splitlines()
     compact_lines: list[str] = []
     keep = True
-    skipped_sections = {"## LLM 分析", "## 候选基金", "## 新闻上下文"}
+    skipped_sections = {"## LLM 分析", "## 候选基金"}
     for line in lines:
         if line.startswith("## "):
             keep = line not in skipped_sections

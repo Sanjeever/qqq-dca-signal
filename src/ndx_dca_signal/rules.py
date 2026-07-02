@@ -343,33 +343,44 @@ def render_signal_markdown(result: SignalResult) -> str:
     if result.llm_analysis:
         lines.extend(["", "## LLM 分析", result.llm_analysis])
 
-    if result.news_context or result.news_errors:
-        lines.extend(["", "## 新闻上下文"])
-        if result.news_errors:
-            for error in result.news_errors:
-                lines.append(f"- {error}")
-        for item in result.news_context:
-            content = str(item.get("content", "")).strip()
-            if not content:
-                continue
-            preview = content[:1000]
-            if len(content) > len(preview):
-                preview += "..."
-            lines.extend(
-                [
-                    f"### {item.get('query', '新闻查询')}",
-                    preview,
-                ]
-            )
+    if result.market_score:
+        lines.extend(
+            [
+                "",
+                "## 市场评分",
+                f"- 总分：{result.market_score.total:.1f} / 100",
+                f"- 阈值：{result.market_score.threshold:.1f}",
+            ]
+        )
+        for name, value in result.market_score.components.items():
+            lines.append(f"- {name}: {value:.1f}")
+        for name, value in result.market_score.metrics.items():
+            if "return" in name or "change" in name or "percentile" in name:
+                lines.append(f"- {name}: {value:.2%}")
+            else:
+                lines.append(f"- {name}: {value:.4f}")
+
+    lines.extend(["", "## 候选基金"])
+    lines.append("| 代码 | 名称 | 状态 | 溢价 | 分位 | 阈值 | 原因 |")
+    lines.append("| --- | --- | --- | ---: | ---: | ---: | --- |")
+    for item in sorted(result.fund_evaluations, key=lambda x: x.snapshot.premium):
+        status = "可选" if item.eligible else "剔除"
+        reason = "；".join(item.reasons) if item.reasons else "通过"
+        lines.append(
+            f"| {item.snapshot.code} | {item.snapshot.name} | {status} | "
+            f"{item.snapshot.premium:.2%} | {item.premium_percentile:.0%} | "
+            f"{item.premium_threshold:.2%} | {reason} |"
+        )
+
+    if result.sim_trade or result.sim_portfolio:
+        lines.extend(["", "## 模拟交易"])
 
     if result.sim_trade:
         trade = result.sim_trade
         lines.extend(
             [
-                "",
-                "## 模拟交易",
-                f"- 状态：{trade.status}",
-                f"- 基金：{trade.code} {trade.name}",
+                f"- 本次状态：{trade.status}",
+                f"- 本次基金：{trade.code} {trade.name}",
                 f"- 挂单时间：{trade.order_time.isoformat()}",
                 f"- 下单方式：{trade.order_price_type}",
                 f"- 下单金额：{trade.order_amount:.2f}",
@@ -392,8 +403,6 @@ def render_signal_markdown(result: SignalResult) -> str:
         recent_trades = portfolio["recent_trades"]
         lines.extend(
             [
-                "",
-                "## 模拟账户",
                 f"- 持仓基金数：{len(positions)}",
                 f"- 持仓成本：{format_optional_money(portfolio['total_cost'])}",
                 f"- 最新市值：{format_optional_money(portfolio['total_market_value'])}",
@@ -438,35 +447,6 @@ def render_signal_markdown(result: SignalResult) -> str:
                 )
         else:
             lines.extend(["", "### 最近模拟交易", "暂无模拟交易。"])
-
-    if result.market_score:
-        lines.extend(
-            [
-                "",
-                "## 市场评分",
-                f"- 总分：{result.market_score.total:.1f} / 100",
-                f"- 阈值：{result.market_score.threshold:.1f}",
-            ]
-        )
-        for name, value in result.market_score.components.items():
-            lines.append(f"- {name}: {value:.1f}")
-        for name, value in result.market_score.metrics.items():
-            if "return" in name or "change" in name or "percentile" in name:
-                lines.append(f"- {name}: {value:.2%}")
-            else:
-                lines.append(f"- {name}: {value:.4f}")
-
-    lines.extend(["", "## 候选基金"])
-    lines.append("| 代码 | 名称 | 状态 | 溢价 | 分位 | 阈值 | 原因 |")
-    lines.append("| --- | --- | --- | ---: | ---: | ---: | --- |")
-    for item in sorted(result.fund_evaluations, key=lambda x: x.snapshot.premium):
-        status = "可选" if item.eligible else "剔除"
-        reason = "；".join(item.reasons) if item.reasons else "通过"
-        lines.append(
-            f"| {item.snapshot.code} | {item.snapshot.name} | {status} | "
-            f"{item.snapshot.premium:.2%} | {item.premium_percentile:.0%} | "
-            f"{item.premium_threshold:.2%} | {reason} |"
-        )
 
     if result.dry_run:
         lines.extend(["", "> dry-run：未发送 PushPlus。"])

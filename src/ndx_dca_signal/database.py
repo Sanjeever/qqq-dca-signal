@@ -160,11 +160,11 @@ class Database:
             )
             return int(cursor.lastrowid)
 
-    def pending_sim_trades(self, trade_date: str | None = None) -> list[dict]:
+    def pending_sim_trades(self, trade_date: str | None = None, include_earlier: bool = False) -> list[dict]:
         sql = "select * from sim_trades where status = 'SUBMITTED'"
         params: tuple[str, ...] = ()
         if trade_date is not None:
-            sql += " and trade_date = ?"
+            sql += " and trade_date <= ?" if include_earlier else " and trade_date = ?"
             params = (trade_date,)
         sql += " order by trade_date, id"
         with self.connect() as conn:

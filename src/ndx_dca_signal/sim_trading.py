@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, time
+from datetime import date, datetime, time
 from zoneinfo import ZoneInfo
 
 from ndx_dca_signal.backtest import enabled_funds
@@ -154,9 +154,10 @@ def settle_pending_trades(config: dict, database: Database, as_of: datetime | No
     trade_date = run_at.date().isoformat()
     akshare = AkShareClient()
     settled: list[dict] = []
-    for row in database.pending_sim_trades(trade_date):
+    for row in database.pending_sim_trades(trade_date, include_earlier=True):
         fund = fund_by_code(config, str(row["code"]))
-        close_price = akshare.fetch_fund_close(fund, run_at.date())
+        row_trade_date = date.fromisoformat(str(row["trade_date"]))
+        close_price = akshare.fetch_fund_close(fund, row_trade_date)
         message = "按当日收盘价模拟成交"
         settled.append(database.fill_sim_trade(int(row["id"]), close_price, message))
     return settled

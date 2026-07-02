@@ -52,7 +52,7 @@ def install_launchd() -> list[Path]:
     config = load_config(None)
     warm_hour, warm_minute = parse_hour_minute(str(config["schedule"].get("warm_cache_time", "14:40:00")))
     run_hour, run_minute = parse_hour_minute(str(config["schedule"].get("run_time", "14:55:00")))
-    settle_hour, settle_minute = parse_hour_minute(str(config.get("sim_trading", {}).get("settle_time", "15:10:00")))
+    settle_hour, settle_minute = parse_hour_minute(str(config.get("sim_trading", {}).get("settle_time", "18:30:00")))
     jobs = [
         (WARM_CACHE_LABEL, "warm-cache", warm_hour, warm_minute),
         (RUN_DAILY_LABEL, "run-daily", run_hour, run_minute),
