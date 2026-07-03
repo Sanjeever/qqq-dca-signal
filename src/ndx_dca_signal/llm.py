@@ -14,9 +14,15 @@ SYSTEM_PROMPT = """你是投资规则解释器，不是最终决策者。
 不得使用确定性收益表达。
 不得编造缺失数据。
 如果数据不足，明确说明数据不足导致不发买入信号。
-如果提供了新闻上下文，只能用于补充风险解释和与规则指标相互印证。
+如果提供了新闻上下文，在规则解释后生成“当前新闻概览”，用 3-5 条概括新闻里的主要事件、主题和潜在风险。
+新闻上下文只能用于说明当前市场背景和补充风险解释，不参与规则决策。
 不得因为新闻上下文而改变 signal。
 新闻上下文可能有噪音、重复或过期，必须谨慎表述，不得夸大。
+不得补充 news_context 未提供的新闻事实、宏观事件、数据类型、机构观点或因果判断。
+如果 news_context 为空，不要生成“当前新闻概览”小节或标题，只在规则解释中说明未提供新闻上下文。
+不要声称新闻与规则信号相互印证。
+输出使用普通 Markdown 小标题和短句项目符号。
+不要使用表格、emoji、横线分隔符、引用块或夸张语气。
 输出应简洁、克制、可审计。"""
 
 
@@ -39,6 +45,34 @@ def build_payload(result: SignalResult) -> dict:
     }
 
 
+def build_rule_summary(result: SignalResult) -> str:
+    lines = [
+        "LLM 分析暂不可用，以下为规则摘要。",
+        f"- 信号：{result.status}",
+        f"- 主因：{'；'.join(result.reasons)}",
+    ]
+    if result.selected_fund:
+        selected = result.selected_fund
+        snapshot = selected.snapshot
+        lines.extend(
+            [
+                f"- 推荐/观察基金：{snapshot.code} {snapshot.name}",
+                f"- 当前溢价：{snapshot.premium:.2%}",
+                f"- 近60日溢价分位：{selected.premium_percentile:.0%}",
+            ]
+        )
+    if result.market_score:
+        lines.append(
+            f"- 市场评分：{result.market_score.total:.1f} / 100"
+            f"（阈值 {result.market_score.threshold:.1f}）"
+        )
+    if result.news_errors:
+        lines.append(f"- 新闻上下文：{'；'.join(result.news_errors)}")
+    elif result.news_context:
+        lines.append("- 新闻上下文：已获取，但本次未由 LLM 展开解读。")
+    return "\n".join(lines)
+
+
 def generate_analysis(result: SignalResult, config: dict) -> str:
     llm_config = config["llm"]
     if not llm_config.get("enabled"):
@@ -55,11 +89,21 @@ def generate_analysis(result: SignalResult, config: dict) -> str:
             {"role": "system", "content": SYSTEM_PROMPT},
             {
                 "role": "user",
-                "content": "请解释以下规则结果，不要改变信号：\n"
+                "content": "请解释以下规则结果，不要改变信号。"
+                "只有当 news_context 为非空列表时，才在规则解释后加入“当前新闻概览”小节，"
+                "只概括 news_context 明确提供的主要事件、主题和风险，"
+                "不要补充输入之外的新闻事实，也不要让新闻影响 signal。"
+                "如果 news_context 为空，不要输出“当前新闻概览”标题，"
+                "只在规则解释中说明未提供新闻上下文。"
+                "输出不要使用表格、emoji 或横线分隔符：\n"
                 + json.dumps(build_payload(result), ensure_ascii=False, indent=2),
             },
         ],
     }
+    max_tokens = llm_config.get("max_tokens")
+    if max_tokens is not None:
+        payload["max_tokens"] = int(max_tokens)
+
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     with httpx.Client(timeout=float(llm_config.get("timeout_seconds", 20))) as client:
         response = client.post(api_url, headers=headers, json=payload)

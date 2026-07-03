@@ -107,6 +107,7 @@ class SignalResult:
             "selected_fund": self.selected_fund.snapshot.code if self.selected_fund else None,
             "market_score": self.market_score.total if self.market_score else None,
             "reasons": self.reasons,
+            "llm_analysis": self.llm_analysis,
             "dry_run": self.dry_run,
             "news_context": self.news_context,
             "news_errors": self.news_errors,

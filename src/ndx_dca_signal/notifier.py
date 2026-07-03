@@ -6,7 +6,7 @@ from urllib.parse import quote
 import httpx
 
 
-DEFAULT_BARK_MAX_BODY_BYTES = 3500
+DEFAULT_BARK_MAX_BODY_BYTES = 2800
 BARK_TRUNCATED_SUFFIX = "\n\n[Bark 摘要已截断，完整内容请看 PushPlus 或本地日志。]"
 
 
@@ -62,7 +62,10 @@ def bark_body(content: str, bark_config: dict) -> str:
     if len(content.encode("utf-8")) <= max_bytes:
         return content
 
-    allowed = max(0, max_bytes - len(BARK_TRUNCATED_SUFFIX.encode("utf-8")))
+    suffix_bytes = len(BARK_TRUNCATED_SUFFIX.encode("utf-8"))
+    if max_bytes <= suffix_bytes:
+        raise ValueError("Bark max_body_bytes must be larger than truncation suffix")
+    allowed = max_bytes - suffix_bytes
     lines = content.splitlines()
     compact_lines: list[str] = []
     keep = True

@@ -40,6 +40,7 @@ bark:
     - "${BARK_KEY}"
   group: "ndx-dca-signal"
   is_archive: true
+  max_body_bytes: 2800
   timeout_seconds: 10
 ```
 
@@ -53,7 +54,7 @@ pushplus:
     - "${PUSHPLUS_TOKEN_2}"
 ```
 
-如果 Bark 和 PushPlus 同时开启，程序会向所有已开启通道推送。
+如果 Bark 和 PushPlus 同时开启，程序会向所有已开启通道推送。Bark 会在正文过长时发送精简摘要，完整 Markdown 优先看 PushPlus 或本地审计记录。
 
 新闻上下文默认关闭。需要让 LLM 结合近期新闻分析时，在本地 `config.yaml` 中开启并填入 `ANYSEARCH_API_KEY`：
 
@@ -65,13 +66,15 @@ news:
   api_key: "${ANYSEARCH_API_KEY}"
   lookback_hours: 24
   max_results: 6
+  max_chars: 3000
+  timeout_seconds: 15
   queries:
     - "Nasdaq 100 纳斯达克100 科技股"
     - "Nvidia Microsoft Apple Meta Amazon Tesla Nasdaq news"
     - "Federal Reserve CPI nonfarm payrolls Nasdaq risk"
 ```
 
-新闻只作为 LLM 分析上下文，不参与 `BUY` / `SKIP` 规则判断，也不能覆盖规则信号；最终推送不单独展示原始新闻上下文。
+新闻只作为 LLM 分析上下文，不参与 `BUY` / `SKIP` 规则判断，也不能覆盖规则信号；LLM 会概括当前新闻里的主要事件和风险，最终推送不单独展示原始新闻上下文。
 
 模拟交易默认关闭。需要开启时在本地 `config.yaml` 中配置：
 
@@ -105,7 +108,7 @@ uv run ndx-dca-signal settle-sim-trades
 
 最终信号正文按“结论、LLM 分析、市场评分、候选基金、模拟交易”的顺序展示；候选基金以 Markdown 表格展示。
 
-如果开启新闻上下文，LLM 分析会结合新闻解释风险，但不会改变规则信号，最终信号正文不会单独展示原始新闻上下文。
+如果开启新闻上下文，LLM 分析会概括当前新闻里的主要事件和风险，但不会改变规则信号，最终信号正文不会单独展示原始新闻上下文。
 
 如果开启模拟交易，最终信号正文会在“模拟交易”段展示模拟持仓、持仓成本、最新市值、浮动盈亏、浮动收益率、待结算挂单和最近模拟交易。如果当天最终信号为 `BUY`，还会展示本次模拟挂单时间、下单金额、数量和结算状态。
 

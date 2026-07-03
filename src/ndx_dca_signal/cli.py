@@ -14,7 +14,7 @@ from ndx_dca_signal.config import load_config, mask_secrets, resolve_project_pat
 from ndx_dca_signal.database import Database
 from ndx_dca_signal.launchd import install_launchd as install_launchd_plist
 from ndx_dca_signal.launchd import uninstall_launchd as uninstall_launchd_plist
-from ndx_dca_signal.llm import generate_analysis
+from ndx_dca_signal.llm import build_rule_summary, generate_analysis
 from ndx_dca_signal.news import fetch_news_context
 from ndx_dca_signal.notifier import send_notification
 from ndx_dca_signal.rules import render_signal_markdown
@@ -80,7 +80,11 @@ def run_daily(
         analysis = generate_analysis(result, loaded)
         result.llm_analysis = analysis
     except Exception as exc:
-        result.llm_analysis = f"LLM 分析生成失败：{exc}"
+        console.print(f"LLM analysis failed: {type(exc).__name__}: {exc}", stderr=True)
+        if loaded["llm"].get("fail_policy") == "use_rule_summary_only":
+            result.llm_analysis = build_rule_summary(result)
+        else:
+            result.llm_analysis = f"LLM 分析生成失败：{exc}"
 
     content = render_signal_markdown(result)
     database.record_signal(result)

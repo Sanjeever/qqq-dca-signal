@@ -109,7 +109,8 @@ llm:
   api_key: "${LLM_API_KEY}"
   model: "gpt-4.1-mini"
   temperature: 0.2
-  timeout_seconds: 20
+  max_tokens: 1500
+  timeout_seconds: 60
   fail_policy: "use_rule_summary_only"
 
 news:
@@ -119,7 +120,7 @@ news:
   api_key: "${ANYSEARCH_API_KEY}"
   lookback_hours: 24
   max_results: 6
-  max_chars: 6000
+  max_chars: 3000
   timeout_seconds: 15
   queries:
     - "Nasdaq 100 纳斯达克100 科技股"
@@ -142,6 +143,7 @@ bark:
     - "${BARK_KEY}"
   group: "ndx-dca-signal"
   is_archive: true
+  max_body_bytes: 2800
   timeout_seconds: 10
 
 sim_trading:
