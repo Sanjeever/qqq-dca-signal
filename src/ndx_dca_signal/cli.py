@@ -11,6 +11,7 @@ from rich.table import Table
 
 from ndx_dca_signal.backtest import Backtester
 from ndx_dca_signal.config import load_config, mask_secrets, resolve_project_path
+from ndx_dca_signal.data_sources import AShareCalendar
 from ndx_dca_signal.database import Database
 from ndx_dca_signal.launchd import install_launchd as install_launchd_plist
 from ndx_dca_signal.launchd import uninstall_launchd as uninstall_launchd_plist
@@ -56,6 +57,10 @@ def run_daily(
 ) -> None:
     loaded, database = prepare(config)
     run_at = datetime.fromisoformat(as_of) if as_of else now_in_config_timezone(loaded)
+    push_on_non_trading_day = loaded["schedule"].get("push_on_non_trading_day", False)
+
+    is_trading = AShareCalendar().is_trading_day(run_at.date())
+    should_push_start = is_trading or push_on_non_trading_day
     start_content = (
         "# NDX开始计算\n\n"
         f"- 时间：{run_at.isoformat()}\n"
@@ -63,7 +68,7 @@ def run_daily(
     )
     if dry_run:
         console.print(start_content)
-    else:
+    elif should_push_start:
         send_notification("NDX开始计算", start_content, loaded)
 
     result = DailyRunner(loaded).run(run_at, dry_run=dry_run)
@@ -71,25 +76,27 @@ def run_daily(
         record_signal_trade(result, loaded, database)
     result.sim_portfolio = build_portfolio_summary(result, loaded, database)
 
-    try:
-        result.news_context = fetch_news_context(loaded)
-    except Exception as exc:
-        result.news_errors.append(f"新闻上下文获取失败：{exc}")
+    skip_calendar = result.status == "SKIP_CALENDAR"
+    if not skip_calendar:
+        try:
+            result.news_context = fetch_news_context(loaded)
+        except Exception as exc:
+            result.news_errors.append(f"新闻上下文获取失败：{exc}")
 
-    try:
-        analysis = generate_analysis(result, loaded)
-        result.llm_analysis = analysis
-    except Exception as exc:
-        console.print(f"LLM analysis failed: {type(exc).__name__}: {exc}", stderr=True)
-        if loaded["llm"].get("fail_policy") == "use_rule_summary_only":
-            result.llm_analysis = build_rule_summary(result)
-        else:
-            result.llm_analysis = f"LLM 分析生成失败：{exc}"
+        try:
+            analysis = generate_analysis(result, loaded)
+            result.llm_analysis = analysis
+        except Exception as exc:
+            console.print(f"LLM analysis failed: {type(exc).__name__}: {exc}", stderr=True)
+            if loaded["llm"].get("fail_policy") == "use_rule_summary_only":
+                result.llm_analysis = build_rule_summary(result)
+            else:
+                result.llm_analysis = f"LLM 分析生成失败：{exc}"
 
     content = render_signal_markdown(result)
     database.record_signal(result)
 
-    should_push = result.status != "SKIP_CALENDAR" or loaded["schedule"].get("push_on_non_trading_day", False)
+    should_push = not skip_calendar or push_on_non_trading_day
     if dry_run or not should_push:
         console.print(content)
         return

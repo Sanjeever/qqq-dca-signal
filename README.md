@@ -104,7 +104,7 @@ uv run ndx-dca-signal settle-sim-trades
 
 `--dry-run` 会正常拉数据、计算规则、调用 LLM、写 SQLite，但不会发送推送。
 
-正式运行 `run-daily` 时，程序会先推送一条 `NDX开始计算`；计算完成后再推送 `NDX今日不买` 或 `NDX买${基金代码}`。`--dry-run` 只在终端打印，不发送推送。
+正式运行 `run-daily` 时，交易日会先推送一条 `NDX开始计算`，计算完成后再推送 `NDX今日不买` 或 `NDX买${基金代码}`；非交易日（`SKIP_CALENDAR`）不推送开始通知，也跳过新闻上下文与 LLM 分析。`--dry-run` 只在终端打印，不发送推送。
 
 最终信号正文按“结论、LLM 分析、市场评分、候选基金、模拟交易”的顺序展示；候选基金以 Markdown 表格展示。
 
