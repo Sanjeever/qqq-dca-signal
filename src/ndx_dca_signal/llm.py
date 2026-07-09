@@ -1,28 +1,36 @@
 from __future__ import annotations
 
 import json
+from importlib import resources
 
 import httpx
 
 from ndx_dca_signal.models import SignalResult
 
 
-SYSTEM_PROMPT = """你是投资规则解释器，不是最终决策者。
-买入/不买由规则引擎已经确定，你只能解释规则结果。
+ZHENGXI_METHOD_RESOURCE = "zhengxi_views_method.md"
+
+
+SYSTEM_PROMPT = """你是 NDX/QDII ETF 定投信号的 LLM 分析器，不是最终决策者。
+买入/不买由规则引擎已经确定，你只能融合解释规则结果、新闻上下文和郑希公开方法框架。
 不得覆盖 signal。
 不得建议用户忽略规则。
 不得使用确定性收益表达。
 不得编造缺失数据。
 如果数据不足，明确说明数据不足导致不发买入信号。
-如果提供了新闻上下文，在规则解释后生成“当前新闻概览”，用 3-5 条概括新闻里的主要事件、主题和潜在风险。
 新闻上下文只能用于说明当前市场背景和补充风险解释，不参与规则决策。
 不得因为新闻上下文而改变 signal。
 新闻上下文可能有噪音、重复或过期，必须谨慎表述，不得夸大。
 不得补充 news_context 未提供的新闻事实、宏观事件、数据类型、机构观点或因果判断。
-如果 news_context 为空，不要生成“当前新闻概览”小节或标题，只在规则解释中说明未提供新闻上下文。
+如果 news_context 为空，简短说明未提供新闻上下文，并继续基于规则结果和郑希公开方法框架分析。
+如果 news_errors 非空，简短说明新闻上下文获取失败，并继续基于规则结果和郑希公开方法框架分析。
 不要声称新闻与规则信号相互印证。
-输出使用普通 Markdown 小标题和短句项目符号。
-不要使用表格、emoji、横线分隔符、引用块或夸张语气。
+可以使用郑希公开方法框架的概念，但不得引用郑希原话。
+不得声称郑希本人对今日市场、NDX、新闻或本次信号发表观点。
+必须自然说明这段分析不改变规则信号。
+输出一段 120-220 字中文分析，控制在 3-4 句内。
+谈到供给端创造需求时，表述为“供给端创造的需求是否持续兑现”或类似自然说法，不要写“供给端需求”。
+不要使用小标题、列表、表格、emoji、横线分隔符、引用块或夸张语气。
 输出应简洁、克制、可审计。"""
 
 
@@ -73,6 +81,15 @@ def build_rule_summary(result: SignalResult) -> str:
     return "\n".join(lines)
 
 
+def load_zhengxi_method() -> str:
+    return (
+        resources.files("ndx_dca_signal.resources")
+        .joinpath(ZHENGXI_METHOD_RESOURCE)
+        .read_text(encoding="utf-8")
+        .strip()
+    )
+
+
 def generate_analysis(result: SignalResult, config: dict) -> str:
     llm_config = config["llm"]
     if not llm_config.get("enabled"):
@@ -82,6 +99,7 @@ def generate_analysis(result: SignalResult, config: dict) -> str:
     if not api_url or not api_key:
         raise ValueError("LLM enabled but api_url or api_key is empty")
 
+    zhengxi_method = load_zhengxi_method()
     payload = {
         "model": llm_config["model"],
         "temperature": float(llm_config.get("temperature", 0.2)),
@@ -89,13 +107,18 @@ def generate_analysis(result: SignalResult, config: dict) -> str:
             {"role": "system", "content": SYSTEM_PROMPT},
             {
                 "role": "user",
-                "content": "请解释以下规则结果，不要改变信号。"
-                "只有当 news_context 为非空列表时，才在规则解释后加入“当前新闻概览”小节，"
-                "只概括 news_context 明确提供的主要事件、主题和风险，"
-                "不要补充输入之外的新闻事实，也不要让新闻影响 signal。"
-                "如果 news_context 为空，不要输出“当前新闻概览”标题，"
-                "只在规则解释中说明未提供新闻上下文。"
-                "输出不要使用表格、emoji 或横线分隔符：\n"
+                "content": "请按郑希公开方法框架，融合以下规则结果和新闻上下文，给出一段结论。"
+                "必须同时覆盖：规则为什么给出当前 signal；新闻上下文补充了哪些市场背景或风险；"
+                "按郑希公开方法框架当前更应关注哪些变量；并说明该分析不改变规则信号。"
+                "不要拆成“规则解释”和“新闻概览”，不要输出小标题、列表、表格或引用块。"
+                "输出为单段 3-4 句，避免长句堆叠。"
+                "不得引用郑希原话，不得声称郑希本人对今日市场或本信号发表观点。"
+                "谈到供给端创造需求时，表述为“供给端创造的需求是否持续兑现”或类似自然说法，"
+                "不要写“供给端需求”。"
+                "不得补充 news_context 之外的新闻事实。\n\n"
+                "郑希公开方法框架（只用于方法推演，不可当作今日原话引用）：\n"
+                f"{zhengxi_method}\n\n"
+                "规则结果与新闻上下文：\n"
                 + json.dumps(build_payload(result), ensure_ascii=False, indent=2),
             },
         ],
