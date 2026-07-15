@@ -51,10 +51,10 @@
 
 当前数据源组合：
 
-- A 股 ETF 实时价格 / IOPV：东方财富窄接口。
+- A 股 ETF 实时价格 / IOPV / 溢价率 / 成交额：ETFirst。
 - 历史溢价：HaoETF 优先。
 - HaoETF 缺失时：AkShare ETF 日线收盘价 + 历史单位净值生成近似历史溢价。
-- NDX 日线：yfinance。
+- NDX 日线：ETFirst。
 - NQ 实时 / 历史盘中：yfinance。
 
 关键数据缺失时，必须返回 `SKIP_DATA`，不要使用静默兜底、旧数据、默认假数据或 LLM 推断。

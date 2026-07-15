@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 import re
 from contextlib import redirect_stderr, redirect_stdout
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from io import StringIO
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -62,6 +62,200 @@ class AShareCalendar:
 
     def is_trading_day(self, value: date) -> bool:
         return self.calendar.is_session(pd.Timestamp(value))
+
+
+class EtfirstClient:
+    BASE_URL = "https://etfapp.euler.southernfund.com:13000"
+    LOGIN_PATH = "/etfapp/retail/auth/cli-login"
+    REALTIME_PATH = "/etfapp/retail/product/getRealTimeData"
+    ETF_AGGREGATE_PATH = "/etfapp/retail/skill/product/aggregate-etf"
+    SUCCESS_CODES = {"0", "200", "0000", "00000", "000000"}
+    PRICE_SCALE = 10000
+    PERCENT_SCALE = 100
+
+    def __init__(
+        self,
+        api_key: str,
+        timeout_seconds: int = 10,
+        max_staleness_seconds: int = 60,
+    ) -> None:
+        if not api_key:
+            raise ValueError("ETFirst API Key 未配置")
+        self.api_key = api_key
+        self.timeout_seconds = timeout_seconds
+        self.max_staleness_seconds = max_staleness_seconds
+
+    def _client(self) -> httpx.Client:
+        return httpx.Client(
+            base_url=self.BASE_URL,
+            timeout=self.timeout_seconds,
+            headers={
+                "Accept": "application/json;charset=UTF-8",
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 "
+                    "Safari/537.36 MicroMessenger/7.0.20.1781 MiniProgramEnv/Windows"
+                ),
+                "X-Client-Type": "cli",
+                "X-Client-Version": "0.2.3",
+            },
+        )
+
+    def _parse_response(self, response: httpx.Response, path: str) -> dict[str, Any]:
+        response.raise_for_status()
+        payload = response.json()
+        if not isinstance(payload, dict):
+            raise ValueError(f"ETFirst {path} 返回格式错误")
+        code = str(payload.get("code", ""))
+        if code not in self.SUCCESS_CODES:
+            message = payload.get("message") or payload.get("msg") or "未知错误"
+            raise ValueError(f"ETFirst {path} 失败 [{code}]：{message}")
+        return payload
+
+    def _login(self, client: httpx.Client) -> str:
+        response = client.post(self.LOGIN_PATH, headers={"X-Api-Key": self.api_key})
+        self._parse_response(response, self.LOGIN_PATH)
+        session = (
+            response.headers.get("session")
+            or response.cookies.get("SESSION")
+            or client.cookies.get("SESSION")
+        )
+        if not session:
+            raise ValueError("ETFirst 登录成功但未返回 Session")
+        return session
+
+    def _post(
+        self,
+        client: httpx.Client,
+        session: str,
+        path: str,
+        body: dict[str, Any],
+    ) -> dict[str, Any]:
+        response = client.post(path, json=body, headers={"session": session})
+        payload = self._parse_response(response, path)
+        data = payload.get("data")
+        if not isinstance(data, dict):
+            raise ValueError(f"ETFirst {path} 缺少 data")
+        return data
+
+    def fetch_fund_snapshots(self, funds: list[FundConfig], as_of: datetime) -> list[FundSnapshot]:
+        if as_of.tzinfo is None:
+            raise ValueError("ETFirst 实时行情要求带时区的 as_of")
+        snapshots: list[FundSnapshot] = []
+        with self._client() as client:
+            session = self._login(client)
+            for fund in funds:
+                data = self._post(
+                    client,
+                    session,
+                    self.REALTIME_PATH,
+                    {"productCode": fund.code, "type": "2"},
+                )
+                snapshots.append(self._snapshot_from_realtime(fund, data, as_of))
+        return snapshots
+
+    def _snapshot_from_realtime(
+        self,
+        fund: FundConfig,
+        data: dict[str, Any],
+        as_of: datetime,
+    ) -> FundSnapshot:
+        raw_day = str(data.get("tradingDay") or "")
+        raw_time = str(data.get("time") or "")
+        if len(raw_time) < 6 or not raw_time.isdigit():
+            raise ValueError(f"{fund.code} ETFirst 行情时间无效：{raw_time or '空'}")
+        try:
+            trade_date = datetime.strptime(raw_day, "%Y%m%d").date()
+            quote_time = time(int(raw_time[:2]), int(raw_time[2:4]), int(raw_time[4:6]))
+        except ValueError as exc:
+            raise ValueError(f"{fund.code} ETFirst 行情日期时间无效：{raw_day} {raw_time}") from exc
+        timestamp = datetime.combine(trade_date, quote_time, tzinfo=as_of.tzinfo)
+        age_seconds = (as_of - timestamp).total_seconds()
+        if trade_date != as_of.date():
+            raise ValueError(f"{fund.code} ETFirst 行情日期过期：{trade_date} != {as_of.date()}")
+        if age_seconds > self.max_staleness_seconds:
+            raise ValueError(f"{fund.code} ETFirst 行情已过期：{age_seconds:.0f} 秒")
+        if age_seconds < -30:
+            raise ValueError(f"{fund.code} ETFirst 行情时间晚于运行时间：{-age_seconds:.0f} 秒")
+
+        raw_price = parse_number(data.get("closePrice"))
+        raw_iopv = parse_number(data.get("iopv"))
+        raw_premium = parse_number(data.get("premDisRto"))
+        turnover = parse_number(data.get("turnover"))
+        if raw_price is None or raw_iopv is None or raw_premium is None:
+            raise ValueError(f"{fund.code} ETFirst 缺少最新价、IOPV 或溢价率")
+        price = raw_price / self.PRICE_SCALE
+        estimate = raw_iopv / self.PRICE_SCALE
+        premium = raw_premium / self.PERCENT_SCALE
+        if price <= 0 or estimate <= 0:
+            raise ValueError(f"{fund.code} ETFirst 最新价或 IOPV 无效")
+        calculated_premium = (price - estimate) / estimate
+        if abs(calculated_premium - premium) > 0.0001:
+            raise ValueError(
+                f"{fund.code} ETFirst 溢价率不一致：接口={premium:.4%}，复算={calculated_premium:.4%}"
+            )
+
+        return FundSnapshot(
+            code=fund.code,
+            name=fund.name,
+            price=price,
+            estimate_value=estimate,
+            premium=premium,
+            turnover_wan=(turnover / 10000) if turnover is not None else None,
+            source="etfirst",
+            timestamp=timestamp,
+        )
+
+    def ndx_history(self, product_code: str, end: date, lookback_days: int = 420) -> pd.DataFrame:
+        return self.ndx_history_range(product_code, end - timedelta(days=lookback_days), end)
+
+    def ndx_history_range(
+        self,
+        product_code: str,
+        start: date,
+        end: date,
+        warmup_days: int = 0,
+    ) -> pd.DataFrame:
+        query_start = start - timedelta(days=warmup_days)
+        with self._client() as client:
+            session = self._login(client)
+            data = self._post(
+                client,
+                session,
+                self.ETF_AGGREGATE_PATH,
+                {
+                    "productCode": product_code,
+                    "startDate": query_start.strftime("%Y%m%d"),
+                    "endDate": end.strftime("%Y%m%d"),
+                    "netInflowType": "3",
+                },
+            )
+        errors = data.get("errors") or {}
+        if errors.get("getReturnTrendList"):
+            raise ValueError(f"ETFirst NDX 日线查询失败：{errors['getReturnTrendList']}")
+        results = data.get("results") or {}
+        trend = results.get("getReturnTrendList") or {}
+        rows = trend.get("NDX") or []
+        if not rows:
+            raise ValueError("ETFirst 未返回 NDX 日线")
+
+        dates: list[datetime] = []
+        closes: list[float] = []
+        for row in rows:
+            raw_date = str(row.get("tradeDate") or "")
+            close = parse_number(row.get("closePrice"))
+            if close is None:
+                raise ValueError(f"ETFirst NDX 日线缺少收盘价：{raw_date or '未知日期'}")
+            try:
+                dates.append(datetime.strptime(raw_date, "%Y%m%d"))
+            except ValueError as exc:
+                raise ValueError(f"ETFirst NDX 日线日期无效：{raw_date}") from exc
+            closes.append(close)
+
+        frame = pd.DataFrame({"Close": closes}, index=pd.DatetimeIndex(dates))
+        if frame.index.has_duplicates:
+            raise ValueError("ETFirst NDX 日线包含重复日期")
+        return frame.sort_index()
 
 
 class HaoEtfClient:
@@ -149,77 +343,6 @@ class HaoEtfClient:
 
 
 class AkShareClient:
-    def fetch_fund_snapshots(self, funds: list[FundConfig], as_of: datetime) -> tuple[list[FundSnapshot], list[str]]:
-        frame = self.fetch_fund_snapshots_frame(funds)
-        by_code = {str(row["代码"]): row for _, row in frame.iterrows()}
-        snapshots: list[FundSnapshot] = []
-        errors: list[str] = []
-        for fund in funds:
-            row = by_code.get(fund.code)
-            if row is None:
-                errors.append(f"{fund.code} AkShare 未返回该基金")
-                continue
-
-            price = parse_number(row["最新价"])
-            estimate = parse_number(row["IOPV实时估值"])
-            turnover = parse_number(row["成交额"])
-            if price is None or estimate is None or estimate <= 0:
-                errors.append(f"{fund.code} AkShare 缺少最新价或 IOPV实时估值")
-                continue
-
-            timestamp = as_of
-            raw_timestamp = row.get("更新时间")
-            if raw_timestamp is not None and not pd.isna(raw_timestamp):
-                timestamp = datetime.fromtimestamp(float(raw_timestamp), tz=as_of.tzinfo)
-
-            snapshots.append(
-                FundSnapshot(
-                    code=fund.code,
-                    name=fund.name,
-                    price=price,
-                    estimate_value=estimate,
-                    premium=(price - estimate) / estimate,
-                    turnover_wan=(turnover / 10000) if turnover is not None else None,
-                    source="eastmoney.ulist",
-                    timestamp=timestamp,
-                    cross_checked=True,
-                )
-            )
-        return snapshots, errors
-
-    def fetch_fund_snapshots_frame(self, funds: list[FundConfig]) -> pd.DataFrame:
-        secids = ",".join(f"{'1' if fund.market.lower() == 'sh' else '0'}.{fund.code}" for fund in funds)
-        url = "https://push2delay.eastmoney.com/api/qt/ulist.np/get"
-        params = {
-            "secids": secids,
-            "fields": "f2,f6,f12,f14,f124,f402,f441,f297",
-            "ut": "bd1d9ddb04089700cf9c27f6f7426281",
-            "fltt": "2",
-            "invt": "2",
-        }
-        with httpx.Client(timeout=15) as client:
-            response = client.get(url, params=params)
-            response.raise_for_status()
-            payload = response.json()
-        rows = (payload.get("data") or {}).get("diff") or []
-        if not rows:
-            raise ValueError("EastMoney ETF realtime returned empty data")
-        frame = pd.DataFrame(rows)
-        frame.rename(
-            columns={
-                "f12": "代码",
-                "f14": "名称",
-                "f2": "最新价",
-                "f6": "成交额",
-                "f124": "更新时间",
-                "f402": "基金折价率",
-                "f441": "IOPV实时估值",
-                "f297": "数据日期",
-            },
-            inplace=True,
-        )
-        return frame
-
     def fetch_fund_history_approx(self, fund: FundConfig) -> list[FundHistoryRow]:
         symbol = f"{fund.market.lower()}{fund.code}"
         price_frame = quiet_call(ak.fund_etf_hist_sina, symbol=symbol)
@@ -298,31 +421,6 @@ class EastMoneyClient:
 
 
 class YahooClient:
-    def ndx_history(self, symbol: str, lookback_days: int = 420) -> pd.DataFrame:
-        frame = yf.download(symbol, period=f"{lookback_days}d", interval="1d", progress=False, auto_adjust=False)
-        if frame.empty:
-            raise ValueError(f"{symbol} daily history is empty")
-        if isinstance(frame.columns, pd.MultiIndex):
-            frame.columns = frame.columns.get_level_values(0)
-        return frame.dropna(subset=["Close"])
-
-    def ndx_history_range(self, symbol: str, start: date, end: date, warmup_days: int = 420) -> pd.DataFrame:
-        start_ts = pd.Timestamp(start) - pd.Timedelta(days=warmup_days)
-        end_ts = pd.Timestamp(end) + pd.Timedelta(days=1)
-        frame = yf.download(
-            symbol,
-            start=start_ts.date().isoformat(),
-            end=end_ts.date().isoformat(),
-            interval="1d",
-            progress=False,
-            auto_adjust=False,
-        )
-        if frame.empty:
-            raise ValueError(f"{symbol} daily history is empty")
-        if isinstance(frame.columns, pd.MultiIndex):
-            frame.columns = frame.columns.get_level_values(0)
-        return frame.dropna(subset=["Close"])
-
     def nq_realtime_change(self, symbol: str) -> float:
         ticker = yf.Ticker(symbol)
         info: dict[str, Any] = ticker.fast_info

@@ -30,6 +30,22 @@ uv run ndx-dca-signal run-daily --dry-run
 
 `config.yaml` 可配置基金池、溢价规则、市场评分、OpenAI 兼容 API 和推送通道。真实密钥只放在本地 `config.yaml` 或环境变量中，不要提交。
 
+ETFirst 提供 ETF 实时价格、IOPV、溢价率、成交额和 NDX 日线。API Key 可直接写在本地 `config.yaml`，也可通过环境变量提供：
+
+```yaml
+data_sources:
+  fund_realtime_primary: etfirst
+  fund_history_primary: haoetf
+  ndx_daily_primary: etfirst
+  nq_symbol: NQ=F
+  etfirst:
+    api_key: "${ETFIRST_API_KEY}"
+    timeout_seconds: 10
+    max_staleness_seconds: 60
+```
+
+ETFirst 实时行情必须是当天数据，且默认不能比运行时间落后超过 60 秒；否则信号返回 `SKIP_DATA`。
+
 推荐使用 Bark：
 
 ```yaml
@@ -166,13 +182,13 @@ uv run ndx-dca-signal backtest --start 2026-06-01 --end 2026-06-30 --market-mode
 
 当前数据源组合：
 
-- A 股 ETF 实时价格 / IOPV：东方财富窄接口。
+- A 股 ETF 实时价格 / IOPV / 溢价率 / 成交额：ETFirst。
 - 历史溢价：HaoETF 优先。
 - HaoETF 缺失时：AkShare ETF 日线收盘价 + 历史单位净值生成近似历史溢价。
-- NDX 日线：yfinance。
+- NDX 日线：ETFirst。
 - NQ 实时 / 历史盘中：yfinance。
 
-免费数据源可能缺失、延迟或字段变化。凡是参与规则的关键字段不可用，系统返回 `SKIP_DATA`，不会用旧数据、默认假数据或 LLM 推断。
+数据源可能缺失、延迟或字段变化。凡是参与规则的关键字段不可用，系统返回 `SKIP_DATA`，不会用旧数据、默认假数据或 LLM 推断。
 
 ## 常用命令
 

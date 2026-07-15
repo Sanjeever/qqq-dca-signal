@@ -9,6 +9,7 @@ from ndx_dca_signal.config import resolve_project_path
 from ndx_dca_signal.data_sources import (
     AShareCalendar,
     AkShareClient,
+    EtfirstClient,
     HaoEtfClient,
     YahooClient,
 )
@@ -30,8 +31,12 @@ class DailyRunner:
     def __init__(self, config: dict) -> None:
         self.config = config
         self.calendar = AShareCalendar()
-        self.akshare = AkShareClient()
-        self.haoetf = HaoEtfClient()
+        etfirst_config = config["data_sources"]["etfirst"]
+        self.etfirst = EtfirstClient(
+            api_key=str(etfirst_config["api_key"]),
+            timeout_seconds=int(etfirst_config["timeout_seconds"]),
+            max_staleness_seconds=int(etfirst_config["max_staleness_seconds"]),
+        )
         self.yahoo = YahooClient()
         self.history_cache = HistoryCache(resolve_project_path(config["paths"]["database"]))
 
@@ -51,8 +56,7 @@ class DailyRunner:
         histories = {}
         data_errors: list[str] = []
         try:
-            snapshots, snapshot_errors = self.akshare.fetch_fund_snapshots(funds, as_of)
-            data_errors.extend(snapshot_errors)
+            snapshots = self.etfirst.fetch_fund_snapshots(funds, as_of)
         except Exception as exc:
             return SignalResult(
                 status="SKIP_DATA",
@@ -94,7 +98,7 @@ class DailyRunner:
 
         evaluations = evaluate_funds(snapshots, histories, self.config)
         try:
-            ndx_history = self.yahoo.ndx_history(self.config["data_sources"]["ndx_symbol"])
+            ndx_history = self.etfirst.ndx_history(funds[0].code, as_of.date())
             nq_change = self.yahoo.nq_realtime_change(self.config["data_sources"]["nq_symbol"])
             market_score = calculate_market_score(ndx_history, nq_change, self.config)
         except Exception as exc:

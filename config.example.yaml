@@ -94,10 +94,14 @@ hard_filters:
   ndx_trend_break_ratio: 0.95
 
 data_sources:
-  fund_realtime_primary: eastmoney_direct
+  fund_realtime_primary: etfirst
   fund_history_primary: haoetf
-  ndx_symbol: "^NDX"
+  ndx_daily_primary: etfirst
   nq_symbol: NQ=F
+  etfirst:
+    api_key: "${ETFIRST_API_KEY}"
+    timeout_seconds: 10
+    max_staleness_seconds: 60
 
 missing_data_policy:
   if_any_required_missing: skip

@@ -6,7 +6,13 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
-from ndx_dca_signal.data_sources import AShareCalendar, AkShareClient, HaoEtfClient, YahooClient
+from ndx_dca_signal.data_sources import (
+    AShareCalendar,
+    AkShareClient,
+    EtfirstClient,
+    HaoEtfClient,
+    YahooClient,
+)
 from ndx_dca_signal.models import FundConfig, FundHistoryRow
 from ndx_dca_signal.reports import write_html_report, write_markdown_report
 from ndx_dca_signal.rules import calculate_market_score, calculate_market_score_daily_proxy, quantile
@@ -34,6 +40,12 @@ class Backtester:
         self.reports_dir = reports_dir
         self.akshare = AkShareClient()
         self.haoetf = HaoEtfClient()
+        etfirst_config = config["data_sources"]["etfirst"]
+        self.etfirst = EtfirstClient(
+            api_key=str(etfirst_config["api_key"]),
+            timeout_seconds=int(etfirst_config["timeout_seconds"]),
+            max_staleness_seconds=int(etfirst_config["max_staleness_seconds"]),
+        )
         self.yahoo = YahooClient()
         self.calendar = AShareCalendar()
 
@@ -41,12 +53,14 @@ class Backtester:
         if market_mode not in {"daily-proxy", "intraday-strict"}:
             raise ValueError("market_mode must be daily-proxy or intraday-strict")
         funds = enabled_funds(self.config)
+        if not funds:
+            raise ValueError("没有启用的基金")
         histories = {fund.code: self._load_fund_history(fund) for fund in funds}
         histories_by_date = {
             code: {row.trade_date: row for row in rows}
             for code, rows in histories.items()
         }
-        ndx = self.yahoo.ndx_history_range(self.config["data_sources"]["ndx_symbol"], start, end)
+        ndx = self.etfirst.ndx_history_range(funds[0].code, start, end, warmup_days=420)
         ndx.index = pd.to_datetime(ndx.index).date
 
         rows: list[dict] = []
